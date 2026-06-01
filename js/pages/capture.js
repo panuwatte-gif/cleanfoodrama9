@@ -16,17 +16,17 @@ export default {
       ${pageHead({ title: 'ถ่ายภาพออเดอร์ & สู้เคสเคลม', desc: 'เก็บภาพ + เลขออเดอร์เป็นหลักฐานโต้แย้งการเคลมบนแพลตฟอร์ม · บันทึกขึ้น Drive + Supabase อัตโนมัติ' })}
 
       <div class="grid cols-3" style="margin-bottom:22px">
-        <button class="qa" style="background:linear-gradient(135deg,var(--basil-600),var(--basil-800));min-height:150px" data-cap="quick">
+        <button class="qa" style="background:linear-gradient(135deg,var(--basil-600),var(--basil-800));min-height:156px" data-cap="quick">
           <div class="qa-ico">${icon('camera', 26)}</div>
-          <div><div class="qa-t">5.1 ถ่าย + กรอกเลขออเดอร์</div><div class="qa-s">เลือกค่าย (default Grab) · ยืนยันภาพ · บันทึก</div></div>
+          <div><div class="qa-t">9.1 ถ่าย + กรอกเลขออเดอร์</div><div class="qa-s">เลือกค่าย (default Grab) · ยืนยัน · เซฟ — หลังบ้านประมวลผลเอง ไม่ต้องรอ</div></div>
         </button>
-        <button class="qa" style="background:linear-gradient(135deg,var(--info),#23525e);min-height:150px" data-cap="scan">
+        <button class="qa" style="background:linear-gradient(135deg,var(--info),#23525e);min-height:156px" data-cap="scan">
           <div class="qa-ico">${icon('scan', 26)}</div>
-          <div><div class="qa-t">5.2 ถ่ายเร็ว อาหาร + บิล</div><div class="qa-s">ไม่ต้องรอประมวลผล · ถ่ายต่อได้ทันที</div></div>
+          <div><div class="qa-t">9.2 ถ่ายเร็ว (หลายใบ)</div><div class="qa-s">เลขออเดอร์ใส่/ไม่ใส่ก็ได้ · แนะนำ 2 ใบ: ① อาหารคู่บิล ② บิลอย่างเดียว — AI ถอดข้อความเฉพาะรูปบิล</div></div>
         </button>
-        <button class="qa" style="background:linear-gradient(135deg,var(--riceberry),#3f2744);min-height:150px" data-cap="translate">
+        <button class="qa" style="background:linear-gradient(135deg,var(--riceberry),#3f2744);min-height:156px" data-cap="translate">
           <div class="qa-ico">${icon('languages', 26)}</div>
-          <div><div class="qa-t">5.3 ถ่ายแปลภาษา → ไทย</div><div class="qa-s">ถ่ายป้าย/ฉลาก/ข้อความ แปลเป็นไทยทันที</div></div>
+          <div><div class="qa-t">9.3 ถ่ายแปลภาษา → ไทย</div><div class="qa-s">ถ่ายป้าย/ฉลาก/ข้อความ แปลเป็นไทยทันที</div></div>
         </button>
       </div>
 

@@ -21,8 +21,10 @@ import control from './pages/control.js';
 import receiving from './pages/receiving.js';
 import handbook from './pages/handbook.js';
 import music from './pages/music.js';
+import expenses from './pages/expenses.js';
+import reports from './pages/reports.js';
 
-const PAGE_MODULES = { dashboard, mytasks, stock, capture, revenue, attendance, recipe, simulator, users, control, receiving, handbook, music };
+const PAGE_MODULES = { dashboard, mytasks, stock, capture, revenue, attendance, recipe, simulator, users, control, receiving, handbook, music, expenses, reports };
 
 const root = document.getElementById('app');
 
@@ -103,13 +105,39 @@ function renderSidebar() {
 function renderTopbar() {
   const p = PAGES.find((x) => x.id === currentPage());
   const ann = state.db.announcements.find((a) => a.active);
+  const stores = state.db.stores.filter((s) => s.status === 'active');
+  const cur = stores.find((s) => s.id === state.session.activeStoreId) || stores[0];
+  const switcher = `<div style="position:relative;margin-left:auto">
+    <button class="store-switch" id="store-switch">${icon('store', 16)}<span>${esc(cur?.short || 'ร้าน')}</span>${icon('chevronDown', 15)}</button>
+  </div>`;
   return `<header class="topbar">
     <button class="burger" id="burger">${icon('sliders', 20)}</button>
     <div><div class="pg-title">${esc(p?.label || '')}</div>${p?.fn ? `<div class="pg-sub">ฟังก์ชัน ${p.fn}</div>` : ''}</div>
-    <div class="topbar-search">${icon('search', 18)}<input placeholder="ค้นหา…"></div>
+    ${switcher}
     <button class="topbar-ico" title="แจ้งเตือน">${icon('bell', 20)}<span class="badge">3</span></button>
   </header>
   ${ann ? `<div class="marquee"><div class="marquee-inner">${icon('megaphone', 18)} ${esc(ann.text)} &nbsp;•&nbsp; ${icon('megaphone', 18)} ${esc(ann.text)}</div></div>` : ''}`;
+}
+
+function openStoreMenu() {
+  const btn = document.getElementById('store-switch');
+  if (!btn) return;
+  document.querySelector('.store-menu')?.remove();
+  const stores = state.db.stores.filter((s) => s.status === 'active');
+  const planned = state.db.stores.filter((s) => s.status !== 'active');
+  const menu = document.createElement('div');
+  menu.className = 'store-menu';
+  menu.innerHTML = `${stores.map((s) => `<div class="store-opt ${s.id === state.session.activeStoreId ? 'on' : ''}" data-store="${s.id}"><span class="dot"></span><span style="flex:1">${esc(s.short)}</span>${s.id === state.session.activeStoreId ? icon('check', 16) : ''}</div>`).join('')}
+    ${planned.map((s) => `<div class="store-opt" style="opacity:.55" data-store="${s.id}"><span class="dot" style="background:var(--ink-3)"></span><span style="flex:1">${esc(s.short)}</span><span class="stk-note">เตรียมเปิด</span></div>`).join('')}
+    <div class="store-opt" data-store-manage style="border-top:1px solid var(--line);color:var(--basil-700)">${icon('plus', 16)}<span>เพิ่ม / จัดการร้าน</span></div>`;
+  btn.parentElement.appendChild(menu);
+  menu.querySelectorAll('[data-store]').forEach((el) => el.addEventListener('click', () => {
+    state.session.activeStoreId = el.dataset.store; persist(); renderApp();
+  }));
+  menu.querySelector('[data-store-manage]').addEventListener('click', () => { menu.remove(); navigate('control'); });
+  setTimeout(() => document.addEventListener('mousedown', function h(e) {
+    if (!menu.contains(e.target) && e.target.id !== 'store-switch') { menu.remove(); document.removeEventListener('mousedown', h); }
+  }), 0);
 }
 
 function renderApp() {
@@ -152,6 +180,7 @@ function renderApp() {
     navigate(el.dataset.nav);
   }));
   document.getElementById('logout-btn')?.addEventListener('click', () => { logout(); location.hash = ''; renderLogin(); });
+  document.getElementById('store-switch')?.addEventListener('click', openStoreMenu);
   document.getElementById('burger')?.addEventListener('click', () => {
     if (window.innerWidth <= 860) document.getElementById('shell').classList.toggle('mobile-open');
     else { state.ui.sidebarCollapsed = !state.ui.sidebarCollapsed; persist(); renderApp(); }

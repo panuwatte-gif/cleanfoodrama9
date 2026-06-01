@@ -253,11 +253,65 @@ button { font-family: inherit; }
 .section-title { font-family: var(--font-head); font-weight: 600; font-size: 17px; color: var(--ink); margin-bottom: 4px; }
 .section-sub { font-size: 12.5px; color: var(--ink-3); margin-bottom: 16px; }
 
+/* stock rows (canonical menu) */
+.perish-dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; display: inline-block; }
+.stk-grouplbl { font-family: var(--font-head); font-weight: 600; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--basil-600); margin: 12px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.stk-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.stk-row:last-child { border-bottom: none; }
+.stk-name { font-family: var(--font-head); font-weight: 500; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+.stk-tag { font-size: 10px; padding: 1px 7px; }
+.stk-note { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+.stk-stat { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.stk-stat b { font-weight: 600; }
+.stk-input { width: 84px; padding: 7px 10px; text-align: right; flex-shrink: 0; }
+.stk-add { margin-top: 10px; }
+@media (max-width: 520px) {
+  .stk-stat { display: none; }
+  .stk-input { width: 72px; }
+}
+
+/* handbook */
+.hb-tbl th { white-space: nowrap; }
+.hb-tbl td { padding: 7px 8px; vertical-align: middle; }
+.hb-grouprow td { background: var(--sage-100); font-family: var(--font-head); font-weight: 600; font-size: 12px; color: var(--basil-700); padding: 6px 10px; letter-spacing: .04em; }
+.hb-num { width: 72px; padding: 6px 8px; text-align: right; }
+.hb-sel { padding: 6px 8px; min-width: 150px; font-size: 13px; }
+.hb-points { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+.hb-points li { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+
+/* unit toggle (kg/g) */
+.seg-u { border: none; background: transparent; cursor: pointer; padding: 6px 14px; border-radius: var(--r-pill); font-family: var(--font-head); font-weight: 600; font-size: 13px; color: var(--ink-3); transition: all var(--t-fast); }
+.seg-u.on { background: var(--paper); color: var(--basil-700); box-shadow: var(--sh-1); }
+
+/* modal (inline CRUD) */
+.modal-ov { position: fixed; inset: 0; z-index: 200; background: rgba(35,48,41,.42); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 20px; animation: rise .2s var(--ease-out); }
+.modal-card { width: min(460px, 100%); background: var(--paper); border-radius: var(--r-lg); box-shadow: var(--sh-4); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.modal-title { font-family: var(--font-head); font-weight: 600; font-size: 18px; color: var(--ink); }
+.modal-x { width: 34px; height: 34px; border: none; background: var(--cream-100); border-radius: 999px; cursor: pointer; display: grid; place-items: center; color: var(--ink-3); }
+.modal-x:hover { background: var(--cream-200); color: var(--ink); }
+.modal-body { padding: 20px 22px; overflow-y: auto; }
+.modal-field { margin-bottom: 14px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--line); background: var(--cream-100); }
+.swatch { cursor: pointer; transition: transform var(--t-fast); }
+.swatch:hover { transform: scale(1.12); }
+
+/* store switcher (topbar) */
+.store-switch { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--paper); cursor: pointer; font-family: var(--font-head); font-weight: 600; font-size: 13.5px; color: var(--ink); transition: all var(--t-fast); }
+.store-switch:hover { border-color: var(--basil-400); }
+.store-menu { position: absolute; top: 56px; right: 0; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--sh-3); min-width: 230px; z-index: 60; overflow: hidden; }
+.store-opt { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; font-size: 14px; }
+.store-opt:hover { background: var(--cream-100); }
+.store-opt.on { background: var(--sage-100); color: var(--basil-700); font-weight: 600; }
+.store-opt .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--basil-500); }
+
+/* up/down reorder buttons */
+.ord-btns { display: inline-flex; flex-direction: column; gap: 1px; }
+.ord-btns button { width: 22px; height: 16px; border: none; background: var(--cream-100); cursor: pointer; display: grid; place-items: center; color: var(--ink-3); border-radius: 4px; }
+.ord-btns button:hover { background: var(--sage-100); color: var(--basil-700); }
+.ord-btns button:disabled { opacity: .3; cursor: default; }
+
 @media (max-width: 860px) {
-  /* Mobile shell fix:
-     Sidebar is position:fixed, so it is removed from CSS Grid flow.
-     The previous `0 1fr` grid made `.main` auto-place into the 0px column,
-     causing a blank page after login on iPhone/Android. */
   .app { grid-template-columns: 1fr; height: 100vh; height: 100dvh; }
   .app.collapsed { grid-template-columns: 1fr; }
   .main { grid-column: 1 / -1; width: 100%; min-width: 0; min-height: 0; }

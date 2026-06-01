@@ -39,21 +39,23 @@ export function logout() {
 export const PAGES = [
   // ทั่วไป
   { id: 'dashboard',  group: 'ทั่วไป',     label: 'หน้าแรก',            icon: 'dashboard', minLevel: 1 },
+  { id: 'reports',    group: 'ทั่วไป',     label: 'หน้าแสดงผล',         icon: 'trendUp',   minLevel: 1, fn: 12 },
   { id: 'mytasks',    group: 'ทั่วไป',     label: 'งานของฉัน & โน้ต',    icon: 'clipboard', minLevel: 1 },
   { id: 'handbook',   group: 'ทั่วไป',     label: 'คู่มือพนักงาน',       icon: 'book2',     minLevel: 1 },
   { id: 'music',      group: 'ทั่วไป',     label: 'เพลงร้าน',            icon: 'music',     minLevel: 1 },
   // ปฏิบัติการ
   { id: 'stock',      group: 'ปฏิบัติการ', label: 'นับสต็อก & พยากรณ์',  icon: 'boxes',     minLevel: 1, fn: 2 },
-  { id: 'receiving',  group: 'ปฏิบัติการ', label: 'รับของ (FIFO)',       icon: 'truck',     minLevel: 1 },
+  { id: 'receiving',  group: 'ปฏิบัติการ', label: 'ส่งของ / รับของ',      icon: 'truck',     minLevel: 1 },
   { id: 'capture',    group: 'ปฏิบัติการ', label: 'ถ่ายภาพออเดอร์',      icon: 'camera',    minLevel: 1, fn: 5 },
   { id: 'revenue',    group: 'ปฏิบัติการ', label: 'บันทึกรายได้',        icon: 'wallet',    minLevel: 1, fn: 4 },
+  { id: 'expenses',   group: 'ปฏิบัติการ', label: 'บันทึกค่าใช้จ่าย',    icon: 'coins',     minLevel: 1 },
   { id: 'attendance', group: 'ปฏิบัติการ', label: 'วันลา & คะแนน',       icon: 'calendar',  minLevel: 1, fn: 6 },
   // เครื่องมือ
   { id: 'recipe',     group: 'เครื่องมือ', label: 'สูตรอาหารอัจฉริยะ',   icon: 'flask',     minLevel: 1, fn: 7 },
   { id: 'simulator',  group: 'เครื่องมือ', label: 'จำลองเมนู & แคมเปญ',  icon: 'calculator',minLevel: 3, fn: 8 },
   // จัดการ
   { id: 'users',      group: 'จัดการ',     label: 'ผู้ใช้ & สิทธิ์',     icon: 'users',     minLevel: 2, fn: 1 },
-  { id: 'control',    group: 'จัดการ',     label: 'ควบคุมระบบ & ต้นทุน', icon: 'sliders',   minLevel: 3, fn: 9, ownerOnly: 'champ' },
+  { id: 'control',    group: 'จัดการ',     label: 'ตั้งค่า',             icon: 'sliders',   minLevel: 3, fn: 13, ownerOnly: 'champ' },
 ];
 
 // level ของตำแหน่ง
@@ -90,4 +92,12 @@ export const can = {
   postAnnouncement: () => levelOf((currentUser() || {}).role) >= 2,
   // มอบหมายงานให้พนักงาน (หัวหน้าขึ้นไป)
   assignTask: () => levelOf((currentUser() || {}).role) >= 2,
+  // แก้หมวด/รายการสต็อก — ตาม editScope ของหมวดนั้น
+  // 'champ' = แชมป์คนเดียว · 'staff' = ทุกคนที่ล็อกอิน (สาขาซื้อเอง)
+  editCategory: (cat) => {
+    const u = currentUser();
+    if (!u) return false;
+    if (!cat || cat.editScope === 'champ') return !!u.isSuperOwner;
+    return true; // 'staff' หรือไม่ระบุ = ทุกคนแก้ได้
+  },
 };

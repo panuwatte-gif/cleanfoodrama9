@@ -3,6 +3,7 @@
    ฟังก์ชันถัดไป (Supabase) จะมาแทน layer นี้ได้เลย
    ============================================================ */
 import { state, initialState } from './state.js';
+import { SCHEMA_VERSION } from './state.js';
 
 const KEY = 'rama9_state_v1';
 
@@ -12,6 +13,13 @@ export function hydrate() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return;
     const saved = JSON.parse(raw);
+    // ถ้าโครงเปลี่ยน (SCHEMA_VERSION ไม่ตรง) → ทิ้งข้อมูลเก่า ใช้โครงใหม่
+    // แต่คง session ไว้ ผู้ใช้จะได้ไม่หลุด login
+    if (saved.schema !== SCHEMA_VERSION) {
+      if (saved.session) state.session = { ...initialState.session, ...saved.session };
+      persist();
+      return;
+    }
     // เก็บ config + db + session ที่บันทึกไว้ ทับลงบนโครงเริ่มต้น
     if (saved.config)  state.config  = { ...initialState.config, ...saved.config };
     if (saved.db)      state.db      = { ...initialState.db, ...saved.db };
@@ -26,6 +34,7 @@ export function hydrate() {
 export function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify({
+      schema: SCHEMA_VERSION,
       config: state.config,
       db: state.db,
       session: state.session,
