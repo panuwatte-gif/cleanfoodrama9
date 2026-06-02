@@ -6,6 +6,7 @@ import { hydrate, persist } from './storage.js';
 import { currentUser, login, logout, visiblePages, canAccess, PAGES, ROLES } from './auth.js';
 import { icon } from './icons.js';
 import { esc } from './components.js';
+const APP_VERSION = 'v15';
 
 // ---- page modules ----
 import dashboard from './pages/dashboard.js';
@@ -62,7 +63,7 @@ function renderLogin() {
         <button class="btn btn-primary" id="login-btn" style="padding:0 22px" ${selectedUser ? '' : 'disabled'}>${icon('chevronRight', 22)}</button>
       </div>
       <div class="login-err">${esc(loginErr)}</div>
-      <div class="login-hint">เดโม่: แตะเลือกผู้ใช้ แล้วใส่ PIN<br>แชมป์ 2425 · เหมยลี่ 9596 · ซู 1234 · ออม 9999 · User1 1111 · User2 2222</div>`}
+      <div class="login-hint" style="opacity:.45">${APP_VERSION}</div>`}
     </div>
   </div>`;
 

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'rama9-pwa-v14';
+const CACHE_VERSION = 'rama9-pwa-v15';
 const APP_SHELL = [
   './',
   './index.html',
@@ -74,10 +74,10 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(
-    caches.match(request).then(cached => cached || fetch(request).then(response => {
+    fetch(request).then(response => {
       const copy = response.clone();
       caches.open(CACHE_VERSION).then(cache => cache.put(request, copy));
       return response;
-    }))
+    }).catch(() => caches.match(request))
   );
 });
