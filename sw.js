@@ -1,11 +1,11 @@
-const CACHE_VERSION = 'rama9-pwa-v12';
+const CACHE_VERSION = 'rama9-pwa-v14';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './css/app.css?v=17',
+  './css/app.css?v=19',
   './css/tokens.css',
-  './js/app.js?v=17',
+  './js/app.js?v=19',
   './js/api.js',
   './js/auth.js',
   './js/components.js',

@@ -35,7 +35,7 @@ function card(title, sub, accent, groups, variant, headCols, cell) {
   return `<div class="card card-pad" style="border-top:3px solid ${accent}">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="section-title">${esc(title)}</div><span class="pill pill-gray">${count} รายการ</span></div>
     ${sub ? `<div class="section-sub" style="margin-bottom:10px">${esc(sub)}</div>` : '<div style="height:6px"></div>'}
-    <table class="tbl fg-tbl"><thead><tr><th>รายการ</th>${headCols(variant)}</tr></thead><tbody>
+    <table class="tbl fg-tbl tbl-stack"><thead><tr><th>รายการ</th>${headCols(variant)}</tr></thead><tbody>
       ${groups.map((g) => `${g.group ? `<tr class="hb-grouprow"><td colspan="6">${esc(g.group.label)}</td></tr>` : ''}${g.items.map((it) => `<tr class="fg-row" data-item="${it.id}" data-variant="${variant}"><td>${esc(it.name)}</td>${cell(it, variant)}</tr>`).join('')}`).join('')}
     </tbody></table>
   </div>`;

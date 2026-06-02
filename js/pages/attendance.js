@@ -45,10 +45,10 @@ export default {
             <thead><tr><th>พนักงาน</th><th>วันที่</th><th>ประเภท</th><th>ยอดขายวันนั้น</th><th style="text-align:right">ผลต่อคะแนน</th></tr></thead>
             <tbody>${state.db.attendance.map((a) => `<tr>
               <td>${esc(state.db.users.find((x) => x.id === a.userId)?.name || '')}</td>
-              <td class="data">${a.date}</td>
-              <td><span class="pill ${a.type === 'ลาป่วย' ? 'pill-orange' : 'pill-gray'}">${esc(a.type)}</span></td>
-              <td class="data">฿16,200</td>
-              <td class="num data" style="color:var(--chili)">−4.2</td></tr>`).join('')}</tbody>
+              <td data-label="วันที่" class="data">${a.date}</td>
+              <td data-label="ประเภท"><span class="pill ${a.type === 'ลาป่วย' ? 'pill-orange' : 'pill-gray'}">${esc(a.type)}</span></td>
+              <td data-label="ยอดขายวันนั้น" class="data">฿16,200</td>
+              <td data-label="ผลต่อคะแนน" class="num data" style="color:var(--chili)">−4.2</td></tr>`).join('')}</tbody>
           </table>
           ${can.viewFinance() ? '' : `<div style="margin-top:12px" class="locked">${icon('lock', 16)} หน้านี้แสดงเฉพาะข้อมูลของคุณ และหัวหน้า/เจ้าของ</div>`}
         </div>

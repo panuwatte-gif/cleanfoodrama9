@@ -15,11 +15,11 @@ export default {
       const net = afterDisc - fee;
       return `<tr>
         <td><span class="pill" style="background:#fff;color:${p.color};border:1px solid var(--line-2)">${esc(p.name)}</span></td>
-        <td class="num data">${baht(price)}</td>
-        <td class="num data" style="color:var(--ink-3)">−${itemDisc}% / −${campaignDisc}%</td>
-        <td class="num data">${baht(Math.round(afterDisc))}</td>
-        <td class="num data" style="color:var(--chili)">−${baht(Math.round(fee))} (${p.feePct}%)</td>
-        <td class="num data" style="font-weight:600;color:var(--basil-700);font-size:15px">${baht(Math.round(net))}</td>
+        <td data-label="ราคาเต็ม" class="num data">${baht(price)}</td>
+        <td data-label="ส่วนลด" class="num data" style="color:var(--ink-3)">−${itemDisc}% / −${campaignDisc}%</td>
+        <td data-label="หลังลด" class="num data">${baht(Math.round(afterDisc))}</td>
+        <td data-label="ค่าฟี" class="num data" style="color:var(--chili)">−${baht(Math.round(fee))} (${p.feePct}%)</td>
+        <td data-label="สุทธิ" class="num data" style="font-weight:600;color:var(--basil-700);font-size:15px">${baht(Math.round(net))}</td>
       </tr>`;
     }).join('');
 

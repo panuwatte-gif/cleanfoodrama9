@@ -44,7 +44,7 @@ function secStock() {
     <div class="card card-pad">
       <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">สต็อกปัจจุบัน + พยากรณ์ + พอใช้กี่วัน</div>${mockTag('สูตรพยากรณ์ตั้งที่หน้าตั้งค่า')}</div>
       <table class="tbl"><thead><tr><th>รายการ</th><th style="text-align:right">คงเหลือ</th><th style="text-align:right">พยากรณ์/วัน</th><th style="text-align:right">พอใช้อีก</th></tr></thead>
-      <tbody>${rows.map((r) => `<tr><td>${esc(r.it.name)}</td><td class="num data">${num(r.tv)} ${esc(r.it.unit)}</td><td class="num data" style="color:var(--basil-700)">${r.fc != null ? r.fc.toFixed(1) : '—'}</td><td class="num data" style="font-weight:600;color:${r.dleft != null && r.dleft < 2 ? 'var(--chili)' : 'var(--ink)'}">${r.dleft != null ? r.dleft + ' วัน' : '—'}</td></tr>`).join('')}</tbody></table>
+      <tbody>${rows.map((r) => `<tr><td>${esc(r.it.name)}</td><td data-label="คงเหลือ" class="num data">${num(r.tv)} ${esc(r.it.unit)}</td><td data-label="พยากรณ์/วัน" class="num data" style="color:var(--basil-700)">${r.fc != null ? r.fc.toFixed(1) : '—'}</td><td data-label="พอใช้อีก" class="num data" style="font-weight:600;color:${r.dleft != null && r.dleft < 2 ? 'var(--chili)' : 'var(--ink)'}">${r.dleft != null ? r.dleft + ' วัน' : '—'}</td></tr>`).join('')}</tbody></table>
     </div>`;
 }
 
@@ -103,7 +103,7 @@ function secRecipe() {
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">${esc(r.name)} — ปรับปริมาณ</div><span class="pill pill-green">×${factor.toFixed(2)}</span></div>
     <div class="section-sub">ตัวอย่างผลคำนวณสูตร · ปรับ/แก้สูตรเต็มที่หน้า "สูตรอาหารอัจฉริยะ"</div>
     <table class="tbl"><thead><tr><th>วัตถุดิบ</th><th style="text-align:right">สัดส่วน</th><th style="text-align:right">ต้องใช้ (ก.)</th></tr></thead>
-    <tbody>${r.ingredients.map((i) => `<tr><td>${esc(i.name)}</td><td class="num data" style="color:var(--ink-3)">${i.ratio}</td><td class="num data" style="font-weight:600;color:var(--basil-700)">${(i.ratio * factor).toFixed(0)}</td></tr>`).join('')}</tbody></table>
+    <tbody>${r.ingredients.map((i) => `<tr><td>${esc(i.name)}</td><td data-label="สัดส่วน" class="num data" style="color:var(--ink-3)">${i.ratio}</td><td data-label="ต้องใช้ (ก.)" class="num data" style="font-weight:600;color:var(--basil-700)">${(i.ratio * factor).toFixed(0)}</td></tr>`).join('')}</tbody></table>
     <button class="btn btn-outline btn-sm" style="margin-top:14px" data-nav="recipe">ไปปรับสูตรเต็ม ${icon('chevronRight', 15)}</button>
   </div>`;
 }
@@ -118,7 +118,7 @@ function secLeave() {
     </div>
     <div class="card card-pad"><div class="overline">ปฏิทินวันลา</div><div class="section-title" style="margin-bottom:12px">รายการลาล่าสุด</div>
       <table class="tbl"><thead><tr><th>พนักงาน</th><th>วันที่</th><th>ประเภท</th><th style="text-align:right">ผลคะแนน</th></tr></thead>
-      <tbody>${state.db.attendance.map((a) => `<tr><td>${esc(state.db.users.find((u) => u.id === a.userId)?.name || '')}</td><td class="data">${a.date}</td><td><span class="pill ${a.type === 'ลาป่วย' ? 'pill-orange' : 'pill-gray'}">${esc(a.type)}</span></td><td class="num data" style="color:var(--chili)">−4.2</td></tr>`).join('')}</tbody></table>
+      <tbody>${state.db.attendance.map((a) => `<tr><td>${esc(state.db.users.find((u) => u.id === a.userId)?.name || '')}</td><td data-label="วันที่" class="data">${a.date}</td><td data-label="ประเภท"><span class="pill ${a.type === 'ลาป่วย' ? 'pill-orange' : 'pill-gray'}">${esc(a.type)}</span></td><td data-label="ผลคะแนน" class="num data" style="color:var(--chili)">−4.2</td></tr>`).join('')}</tbody></table>
       <div style="margin-top:10px">${mockTag('สูตรคะแนนตั้งที่หน้าตั้งค่า')}</div>
     </div>
   </div>`;

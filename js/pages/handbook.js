@@ -48,9 +48,9 @@ function menuSection() {
   const foodCard = `<div class="card card-pad" style="border-top:3px solid var(--basil-600)">
     <div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="section-title">อาหารปรุงสำเร็จ</div><span class="pill pill-gray">มาตรฐาน ข้าว ${cfg.portionStd.rice}g · เนื้อ ${cfg.portionStd.protein}g</span></div>
     <div class="section-sub" style="margin-bottom:12px">ค่าเริ่มต้นข้าว 150g / เนื้อ 100g — แก้รายเมนูได้ (เช่น XL, เมนูเส้น)</div>
-    <table class="tbl hb-tbl">${head}<tbody>
+    <div class="tbl-scroll"><table class="tbl hb-tbl">${head}<tbody>
       ${foodGroups.map((g) => `<tr class="hb-grouprow"><td colspan="8">${esc(g.group.label)}</td></tr>${g.items.map(foodRow).join('')}`).join('')}
-    </tbody></table>
+    </tbody></table></div>
   </div>`;
 
   // เครื่องดื่ม (kcal อย่างเดียว)
@@ -58,13 +58,13 @@ function menuSection() {
   const drinkGroups = drinkCat ? itemsBySubcat(drinkCat.id) : [];
   const drinkCard = `<div class="card card-pad" style="border-top:3px solid var(--info);margin-top:18px">
     <div class="section-title" style="margin-bottom:12px">เครื่องดื่ม</div>
-    <table class="tbl hb-tbl"><thead><tr><th>เครื่องดื่ม</th><th>ปริมาณ (ml)</th><th>kcal</th><th>โปรตีน</th><th>ไขมัน</th><th>คาร์บ</th></tr></thead><tbody>
+    <div class="tbl-scroll"><table class="tbl hb-tbl"><thead><tr><th>เครื่องดื่ม</th><th>ปริมาณ (ml)</th><th>kcal</th><th>โปรตีน</th><th>ไขมัน</th><th>คาร์บ</th></tr></thead><tbody>
       ${drinkGroups.map((g) => `<tr class="hb-grouprow"><td colspan="6">${esc(g.sub.name)}</td></tr>${g.items.map((it) => {
         const d = nut[it.id] || {};
         const ml = d.ml ?? (/ชาไทย|มัทฉะ/.test(it.name) ? 220 : 250);
         return `<tr><td>${esc(it.name)}</td><td><input class="input data hb-num" value="${ml}"></td><td><input class="input data hb-num" value="${d.kcal ?? ''}" placeholder="${g.sub.id === 'sub_zero' ? '0' : '—'}"></td><td><input class="input data hb-num" value="${d.protein ?? ''}" placeholder="—"></td><td><input class="input data hb-num" value="${d.fat ?? ''}" placeholder="—"></td><td><input class="input data hb-num" value="${d.carb ?? ''}" placeholder="—"></td></tr>`;
       }).join('')}`).join('')}
-    </tbody></table>
+    </tbody></table></div>
   </div>`;
 
   return `${foodCard}${drinkCard}<div style="margin-top:12px">${mockTag('ดึงรายการจากทะเบียนกลาง — เพิ่มเมนูที่หน้านับสต็อก/ตั้งค่า แล้วขึ้นที่นี่อัตโนมัติ')}</div>`;

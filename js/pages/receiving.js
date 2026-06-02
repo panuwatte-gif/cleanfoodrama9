@@ -17,7 +17,7 @@ const unitLabel = () => (unit === 'kg' ? 'กก.' : 'ก.');
 function entryGrid() {
   return foodGrid({
     headCols: () => `<th style="text-align:right">จำนวน</th>`,
-    cell: () => `<td style="text-align:right"><div class="row" style="gap:6px;justify-content:flex-end"><input class="input data" placeholder="0" inputmode="decimal" style="width:84px;text-align:right;padding:6px"><span class="stk-note" style="width:24px">${unitLabel()}</span></div></td>`,
+    cell: () => `<td data-label="จำนวน" style="text-align:right"><div class="row" style="gap:6px;justify-content:flex-end"><input class="input data" placeholder="0" inputmode="decimal" style="width:84px;text-align:right;padding:6px"><span class="stk-note" style="width:24px">${unitLabel()}</span></div></td>`,
   });
 }
 
@@ -40,11 +40,11 @@ export default {
           <thead><tr><th>รายการ</th><th style="text-align:right">ส่ง</th><th style="text-align:right">รับจริง</th><th style="text-align:right">ส่วนต่าง</th><th>สถานะ</th><th></th></tr></thead>
           <tbody>${recs.map((r) => { const diff = r.received.qty - r.sent.qty; return `<tr>
             <td>${esc(itemName(r.itemId))}</td>
-            <td style="text-align:right"><input class="input data" style="width:74px;text-align:right;padding:6px" value="${r.sent.qty}"></td>
-            <td style="text-align:right"><input class="input data" style="width:74px;text-align:right;padding:6px" value="${r.received.qty}"></td>
-            <td class="num data" style="color:${diff === 0 ? 'var(--ink-3)' : 'var(--chili)'}">${diff > 0 ? '+' : ''}${diff} ${r.unit}</td>
-            <td>${r.received.ok ? '<span class="pill pill-green">ตรง</span>' : '<span class="pill pill-red">ไม่ตรง</span>'}${diff < 0 ? '<div class="stk-note">ครัวกลางส่งขาด</div>' : diff > 0 ? '<div class="stk-note">ส่งเกิน</div>' : ''}</td>
-            <td style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`; }).join('')}</tbody>
+            <td data-label="ส่ง" style="text-align:right"><input class="input data" style="width:74px;text-align:right;padding:6px" value="${r.sent.qty}"></td>
+            <td data-label="รับจริง" style="text-align:right"><input class="input data" style="width:74px;text-align:right;padding:6px" value="${r.received.qty}"></td>
+            <td data-label="ส่วนต่าง" class="num data" style="color:${diff === 0 ? 'var(--ink-3)' : 'var(--chili)'}">${diff > 0 ? '+' : ''}${diff} ${r.unit}</td>
+            <td data-label="สถานะ">${r.received.ok ? '<span class="pill pill-green">ตรง</span>' : '<span class="pill pill-red">ไม่ตรง</span>'}${diff < 0 ? '<div class="stk-note">ครัวกลางส่งขาด</div>' : diff > 0 ? '<div class="stk-note">ส่งเกิน</div>' : ''}</td>
+            <td data-label="" style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`; }).join('')}</tbody>
         </table>
       </div>`;
     } else {

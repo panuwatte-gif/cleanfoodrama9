@@ -31,7 +31,7 @@ export default {
           <input class="input data" value="${target}" style="margin-bottom:16px">
           <table class="tbl">
             <thead><tr><th>วัตถุดิบ</th><th style="text-align:right">สัดส่วน</th><th style="text-align:right">ต้องใช้ (ก.)</th></tr></thead>
-            <tbody>${r.ingredients.map((ing) => `<tr><td>${esc(ing.name)}</td><td class="num data" style="color:var(--ink-3)">${ing.ratio}</td><td class="num data" style="font-weight:600;color:var(--basil-700)">${(ing.ratio * factor).toFixed(0)}</td></tr>`).join('')}</tbody>
+            <tbody>${r.ingredients.map((ing) => `<tr><td>${esc(ing.name)}</td><td data-label="สัดส่วน" class="num data" style="color:var(--ink-3)">${ing.ratio}</td><td data-label="ต้องใช้ (ก.)" class="num data" style="font-weight:600;color:var(--basil-700)">${(ing.ratio * factor).toFixed(0)}</td></tr>`).join('')}</tbody>
           </table>
         </div>
 

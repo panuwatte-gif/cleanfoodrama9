@@ -44,7 +44,7 @@ export default {
           <div class="stk-note">ลาในวันยอดขายสูง = หักหนักกว่า</div>`, 'var(--basil-600)')}
 
         ${section('ค่าฟีแพลตฟอร์ม', 'Delivery (ฟังก์ชัน 8)', `
-          <table class="tbl"><tbody>${c.platforms.map((p) => `<tr><td><span class="pill" style="background:#fff;color:${p.color};border:1px solid var(--line-2)">${esc(p.name)}</span></td><td style="text-align:right"><input class="input data pf-fee" data-pf="${p.id}" value="${p.feePct}" style="width:60px;text-align:right;padding:7px">%</td><td style="text-align:right;width:36px"><button class="btn btn-ghost btn-sm" data-pf-del="${p.id}">${icon('trash', 14)}</button></td></tr>`).join('')}</tbody></table>
+          <table class="tbl"><tbody>${c.platforms.map((p) => `<tr><td><span class="pill" style="background:#fff;color:${p.color};border:1px solid var(--line-2)">${esc(p.name)}</span></td><td data-label="ค่าฟี" style="text-align:right"><input class="input data pf-fee" data-pf="${p.id}" value="${p.feePct}" style="width:60px;text-align:right;padding:7px">%</td><td data-label="" style="text-align:right;width:36px"><button class="btn btn-ghost btn-sm" data-pf-del="${p.id}">${icon('trash', 14)}</button></td></tr>`).join('')}</tbody></table>
           <button class="btn btn-outline btn-sm" style="width:100%;margin-top:10px" id="add-pf">${icon('plus', 15)} เพิ่มแพลตฟอร์ม</button>`, 'var(--info)')}
 
         ${section('ร้านค้า', 'จัดการร้าน (เพิ่ม/เปลี่ยนชื่อ/ปิด) · ขายหลายแพลตฟอร์ม', `

@@ -42,6 +42,8 @@ function refresh() { renderApp(); }
 const ctx = { state, navigate, refresh };
 
 /* ---------- LOGIN ---------- */
+// ปิดระบบรหัสผ่านชั่วคราว (ส่งให้พนักงานดู) — แตะผู้ใช้เพื่อเข้าเลย ไม่ต้องใส่ PIN
+const AUTH_DISABLED = true;
 let selectedUser = null, loginErr = '';
 function renderLogin() {
   root.innerHTML = `<div class="login-wrap">
@@ -50,23 +52,30 @@ function renderLogin() {
       <h1>${esc(state.config.brand.companyName)}</h1>
       <div class="sub">ระบบจัดการหลังบ้าน · สาขาพระราม 9</div>
       <div class="login-users">
-        ${state.db.users.map((u) => `<div class="login-user ${selectedUser === u.id ? 'sel' : ''}" data-u="${u.id}">
+        ${state.db.users.map((u) => `<div class="login-user" data-u="${u.id}">
           <div class="ava">${u.avatar}</div><div class="nm">${esc(u.name)}</div><div class="rl">${ROLES[u.role].label}</div>
         </div>`).join('')}
       </div>
+      ${AUTH_DISABLED ? `<div class="login-hint">แตะเลือกชื่อเพื่อเข้าใช้งาน (ปิดรหัสผ่านชั่วคราว)</div>` : `
       <div class="pin-row">
         <input class="pin-input" id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" ${selectedUser ? '' : 'disabled'}>
         <button class="btn btn-primary" id="login-btn" style="padding:0 22px" ${selectedUser ? '' : 'disabled'}>${icon('chevronRight', 22)}</button>
       </div>
       <div class="login-err">${esc(loginErr)}</div>
-      <div class="login-hint">เดโม่: แตะเลือกผู้ใช้ แล้วใส่ PIN<br>แชมป์ 2425 · เหมยลี่ 9596 · ซู 1234 · ออม 9999 · User1 1111 · User2 2222</div>
+      <div class="login-hint">เดโม่: แตะเลือกผู้ใช้ แล้วใส่ PIN<br>แชมป์ 2425 · เหมยลี่ 9596 · ซู 1234 · ออม 9999 · User1 1111 · User2 2222</div>`}
     </div>
   </div>`;
 
+  const enter = (uid) => {
+    state.session.currentUserId = uid; persist();
+    loginErr = ''; location.hash = 'dashboard'; renderApp();
+  };
   root.querySelectorAll('[data-u]').forEach((el) => el.addEventListener('click', () => {
+    if (AUTH_DISABLED) { enter(el.dataset.u); return; }
     selectedUser = el.dataset.u; loginErr = ''; renderLogin();
     setTimeout(() => document.getElementById('pin')?.focus(), 30);
   }));
+  if (AUTH_DISABLED) return;
   const doLogin = () => {
     const pin = document.getElementById('pin').value;
     const res = login(selectedUser, pin);

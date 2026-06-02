@@ -40,10 +40,10 @@ export default {
         <span class="perish-dot" title="${esc(pl.label)} (~${pl.shelfDays} วัน)" style="background:${pl.color}"></span>
         <span class="stk-name">${esc(it.name)}${it.madeInHouse ? '<span class="pill pill-purple stk-tag">ทำเอง</span>' : ''}${it.note ? `<span class="stk-note">${esc(it.note)}</span>` : ''}${storeTag}</span>
         <span class="stk-stat">${tv != null ? `คงเหลือ <b class="data">${num(tv)}</b>` : '<span style="color:var(--ink-3)">—</span>'}${daysLeft != null ? ` · พอใช้ <b class="data" style="color:${daysLeft < 2 ? 'var(--chili)' : 'var(--basil-700)'}">${daysLeft} วัน</b>` : ''}</span>
-        ${editable ? `<span class="ord-btns"><button data-up="${it.id}" style="transform:rotate(180deg)">${icon('chevronDown', 12)}</button><button data-down="${it.id}">${icon('chevronDown', 12)}</button></span>
+        <input class="input stk-input data" placeholder="${tv != null ? num(tv) : '0'}" inputmode="decimal">
+        ${editable ? `<span class="stk-manage"><span class="ord-btns"><button data-up="${it.id}" style="transform:rotate(180deg)">${icon('chevronDown', 12)}</button><button data-down="${it.id}">${icon('chevronDown', 12)}</button></span>
           <button class="btn btn-ghost btn-sm" data-edit="${it.id}">${icon('edit', 14)}</button>
-          <button class="btn btn-ghost btn-sm" data-del="${it.id}" style="color:var(--chili)">${icon('trash', 14)}</button>`
-        : `<input class="input stk-input data" placeholder="${tv != null ? num(tv) : '0'}" inputmode="decimal">`}
+          <button class="btn btn-ghost btn-sm" data-del="${it.id}" style="color:var(--chili)">${icon('trash', 14)}</button></span>` : ''}
       </div>`;
     };
 

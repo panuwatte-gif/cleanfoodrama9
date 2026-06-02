@@ -270,6 +270,75 @@ button { font-family: inherit; }
   .stk-input { width: 72px; }
 }
 
+/* ============================================================
+   MOBILE DATA-ENTRY (≤640px) — พับตาราง/กริดให้กรอกง่าย ไม่ต้องเลื่อนข้าง
+   ============================================================ */
+@media (max-width: 640px) {
+  .content-inner { padding: 16px 13px; }
+  /* ทุกกริดเหลือคอลัมน์เดียว (กัน overflow จาก inline grid-template) */
+  .content-inner .grid { grid-template-columns: 1fr !important; gap: 14px; }
+
+  /* แถวสต็อก: ชื่อเต็มบรรทัด, ช่องกรอก/ปุ่มจัดการลงมาเต็มความกว้างด้านล่าง */
+  .stk-row { flex-wrap: wrap; align-items: center; }
+  .stk-name { flex: 1 1 100%; font-size: 15px; }
+  .stk-stat { display: inline-flex; order: 2; }
+  .stk-input { width: 100%; order: 5; flex: 1 1 100%; text-align: left; font-size: 16px; padding: 10px 12px; }
+  .ord-btns { order: 3; }
+
+  /* ตารางที่มีช่องกรอก → พับเป็นการ์ด (ใช้คลาส .tbl-stack + td[data-label]) */
+  .tbl-stack, .tbl-stack tbody, .tbl, .tbl tbody { display: block; }
+  .tbl-stack thead, .tbl thead { display: none; }
+  .tbl-stack tr, .tbl tr { display: block; border: 1px solid var(--line); border-radius: var(--r-md); padding: 9px 13px; margin-bottom: 10px; background: var(--cream-100); }
+  .tbl-stack tr.hb-grouprow, .tbl tr.hb-grouprow { background: var(--sage-100); padding: 6px 12px; margin-bottom: 8px; }
+  .tbl-stack tr:hover td, .tbl tr:hover td { background: none; }
+  .tbl-stack td, .tbl td { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: none; padding: 5px 0; text-align: left; }
+  .tbl-stack td::before, .tbl td::before { content: attr(data-label); color: var(--ink-3); font-size: 12px; font-family: var(--font-head); font-weight: 500; flex-shrink: 0; }
+  .tbl-stack td:first-child, .tbl td:first-child { font-family: var(--font-head); font-weight: 600; font-size: 15px; padding: 2px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  .tbl-stack td:first-child::before, .tbl td:first-child::before { content: none; }
+  .tbl-stack input:not([type=checkbox]), .tbl-stack select, .tbl input:not([type=checkbox]), .tbl select { width: auto; min-width: 90px; max-width: 62%; text-align: right; font-size: 16px; }
+  .tbl .num, .tbl-stack .fg-tbl td:first-child, .tbl-stack td.num { text-align: left; }
+
+  /* ตารางอ่านอย่างเดียว → เลื่อนแนวนอนภายในการ์ด (ไม่ดันทั้งหน้า) */
+  .tbl-scroll { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* ตารางอ้างอิงหนาที่ครอบ .tbl-scroll (และไม่ได้ตั้งใจให้พับ → ไม่มี .tbl-stack)
+     ต้องคงสภาพเป็นตารางแล้วเลื่อนแนวนอนในกล่อง แทนการพับเป็นการ์ด */
+  .tbl-scroll .tbl:not(.tbl-stack) { display: table; min-width: 540px; }
+  .tbl-scroll .tbl:not(.tbl-stack) thead { display: table-header-group; }
+  .tbl-scroll .tbl:not(.tbl-stack) tbody { display: table-row-group; }
+  .tbl-scroll .tbl:not(.tbl-stack) tr { display: table-row; border: none; border-radius: 0; padding: 0; margin: 0; background: none; }
+  .tbl-scroll .tbl:not(.tbl-stack) td { display: table-cell; justify-content: initial; gap: 0; border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; margin: 0; font-weight: inherit; font-size: inherit; }
+  .tbl-scroll .tbl:not(.tbl-stack) td::before { content: none; }
+
+  /* การ์ดสรุปกดได้ในมือถือ */
+  .tap-card { cursor: pointer; }
+
+  /* login: พอดีจอ ไม่ต้องเลื่อน */
+  .login-wrap { padding: 16px; align-items: flex-start; }
+  .login-card { padding: 26px 20px 22px; margin: auto; }
+  .login-logo { width: 76px; height: 76px; }
+
+  /* แถวจัดการสต็อก (แก้/ลบ/เลื่อน) ลงบรรทัดใหม่ */
+  .stk-manage { order: 6; flex: 1 1 100%; display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+
+  /* ค่าใช้จ่าย: ซ่อนการ์ดสรุปใหญ่ในมือถือ — ใช้ชิปเลือกหมวดแทน (กดแล้วเข้าหน้ากรอกเลย) */
+  .exp-summary { display: none; }
+}
+
+/* calendar (revenue) */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { margin-bottom: 4px; }
+.cal-h { text-align: center; font-size: 11.5px; color: var(--ink-3); font-family: var(--font-head); font-weight: 600; padding: 4px 0; }
+.cal-day { position: relative; aspect-ratio: 1; border: none; background: var(--cream-100); border-radius: 10px; cursor: pointer; font-family: var(--font-mono); font-size: 14px; color: var(--ink); display: flex; align-items: center; justify-content: center; transition: all var(--t-fast); }
+.cal-day:hover { background: var(--sage-100); }
+.cal-day.has { font-weight: 600; color: var(--basil-700); }
+.cal-day.sel { background: var(--basil-600); color: #fff; box-shadow: var(--sh-2); }
+.cal-dot { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 999px; background: var(--basil-500); }
+.cal-day.sel .cal-dot { background: #fff; }
+@media (max-width: 640px) {
+  .cal-day { font-size: 13px; border-radius: 8px; }
+  .cal-grid { gap: 3px; }
+}
+
 /* handbook */
 .hb-tbl th { white-space: nowrap; }
 .hb-tbl td { padding: 7px 8px; vertical-align: middle; }
@@ -321,9 +390,9 @@ button { font-family: inherit; }
   .app.mobile-open .sidebar { transform: none; }
   .app.mobile-open::after { content: ''; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 90; }
   .topbar-search { display: none; }
-  /* tables scroll horizontally instead of being clipped */
-  .card { overflow-x: auto; }
-  .tbl { min-width: 540px; }
+  /* ตารางทั่วไป "พับเป็นการ์ด" เท่านั้น; เฉพาะตารางที่ครอบด้วย .tbl-scroll ถึงจะเลื่อนแนวนอน (ในกล่องตัวเอง ไม่ดันทั้งหน้า) */
+  .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tbl-scroll .tbl { min-width: 540px; }
   /* show bottom tab bar, leave room for it */
   .tabbar-m {
     display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 95;

@@ -33,7 +33,7 @@ export default {
     const cat = cats.find((c) => c.id === activeCat);
     const monthTotal = cats.reduce((s, c) => s + catAmount(c), 0);
 
-    const summary = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:22px">
+    const summary = `<div class="grid exp-summary" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:22px">
       ${cats.map((c) => `<button class="kpi" style="text-align:left;border:none;cursor:pointer;${c.id === activeCat ? 'outline:2px solid var(--basil-500)' : ''}" data-ecat="${c.id}">
         <div class="kpi-ico" style="background:var(--cream-100);color:${c.color}">${icon(c.icon, 20)}</div>
         <div class="kpi-label">${esc(c.name)}${c.owner ? ' ' + icon('lock', 11) : ''}</div>
@@ -134,9 +134,9 @@ function panel(cat) {
 function foodcostPanel(cat) {
   const grid = foodGrid({
     headCols: () => `<th style="text-align:right">รับเข้า</th><th style="text-align:right">ต้นทุน/หน่วย</th><th style="text-align:right">เป็นเงิน</th>`,
-    cell: (it) => { const q = recvQty(it.id); return `<td class="num data fc-q" data-qty="${q}">${q ? num(q) : '<span style="color:var(--ink-3)">—</span>'}</td>`
-      + `<td style="text-align:right"><div class="row" style="gap:3px;justify-content:flex-end"><span class="stk-note">฿</span><input class="input data fc-cost" value="${state.db.foodCosts[it.id] || ''}" placeholder="0" style="width:64px;text-align:right;padding:6px"></div></td>`
-      + `<td class="num data fc-amt" style="font-weight:600;color:var(--basil-700)">—</td>`; },
+    cell: (it) => { const q = recvQty(it.id); return `<td data-label="รับเข้า" class="num data fc-q" data-qty="${q}">${q ? num(q) : '<span style="color:var(--ink-3)">—</span>'}</td>`
+      + `<td data-label="ต้นทุน/หน่วย" style="text-align:right"><div class="row" style="gap:3px;justify-content:flex-end"><span class="stk-note">฿</span><input class="input data fc-cost" value="${state.db.foodCosts[it.id] || ''}" placeholder="0" style="width:64px;text-align:right;padding:6px"></div></td>`
+      + `<td data-label="เป็นเงิน" class="num data fc-amt" style="font-weight:600;color:var(--basil-700)">—</td>`; },
   });
   return `<div class="card card-pad" style="border-top:3px solid ${cat.color}">
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">ต้นทุนรับอาหาร</div><span class="pill pill-green">${icon('truck', 13)} โครงเดียวกับหน้าส่ง/รับของ</span></div>
@@ -183,15 +183,15 @@ function wagePanel() {
   return `<div class="card card-pad" style="border-top:3px solid var(--basil-600)">
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">ค่าแรงรายคน</div><span class="pill pill-gray">รวม ~${baht(monthlyTotal)}/เดือน</span></div>
     <div class="section-sub">เงินเดือน = คิดทุกเดือนคงที่ · รายวัน = ไม่คิดวันลา/ร้านหยุด และหยุดจ่ายเมื่อลาออก</div>
-    <table class="tbl">
+    <table class="tbl tbl-stack">
       <thead><tr><th>พนักงาน</th><th>ประเภท</th><th style="text-align:right">อัตรา (฿)</th><th style="text-align:right">ต่อเดือน (ประมาณ)</th><th>สถานะ</th><th></th></tr></thead>
       <tbody>${ppl.map((p) => `<tr style="${p.active ? '' : 'opacity:.5'}">
         <td class="li-t">${esc(p.name)}</td>
-        <td><select class="input" style="padding:6px 8px;min-width:110px"><option ${p.type === 'monthly' ? 'selected' : ''}>เงินเดือน</option><option ${p.type === 'daily' ? 'selected' : ''}>รายวัน</option></select></td>
-        <td style="text-align:right"><input class="input data" value="${p.amount}" style="width:96px;text-align:right;padding:6px"><span class="stk-note"> /${p.type === 'monthly' ? 'ด.' : 'วัน'}</span></td>
-        <td class="num data" style="font-weight:600">${baht(p.type === 'monthly' ? p.amount : p.amount * 26)}</td>
-        <td>${p.active ? '<span class="pill pill-green">ทำงาน</span>' : '<span class="pill pill-gray">ลาออก</span>'}</td>
-        <td style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`).join('')}</tbody>
+        <td data-label="ประเภท"><select class="input" style="padding:6px 8px;min-width:110px"><option ${p.type === 'monthly' ? 'selected' : ''}>เงินเดือน</option><option ${p.type === 'daily' ? 'selected' : ''}>รายวัน</option></select></td>
+        <td data-label="อัตรา" style="text-align:right"><input class="input data" value="${p.amount}" style="width:96px;text-align:right;padding:6px"><span class="stk-note"> /${p.type === 'monthly' ? 'ด.' : 'วัน'}</span></td>
+        <td data-label="ต่อเดือน" class="num data" style="font-weight:600">${baht(p.type === 'monthly' ? p.amount : p.amount * 26)}</td>
+        <td data-label="สถานะ">${p.active ? '<span class="pill pill-green">ทำงาน</span>' : '<span class="pill pill-gray">ลาออก</span>'}</td>
+        <td data-label="" style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`).join('')}</tbody>
     </table>
     <button class="btn btn-outline btn-sm" style="margin-top:12px">${icon('plus', 15)} เพิ่มพนักงาน</button>
     <div style="margin-top:10px">${mockTag('รายวันคิดตามวันมาทำงานจริง (เชื่อมหน้าวันลา)')}</div>
@@ -205,10 +205,10 @@ function itemizedPanel(cat) {
 
   const itemRow = (it) => `<tr class="it-row">
     <td>${esc(it.name)}${it.stockItemId === null && cat.linksStock ? '<span class="pill pill-orange stk-tag" title="ยังไม่มีในสต็อก — จะถูกเพิ่มให้">ใหม่</span>' : ''}</td>
-    <td><div class="row" style="gap:3px;justify-content:flex-end"><span class="stk-note">฿</span><input class="input data it-price" value="${it.unitPrice}" style="width:62px;text-align:right;padding:6px"><span class="stk-note">/</span><input class="input it-unit" value="${esc(it.unit)}" style="width:56px;padding:6px;font-size:12px"></div></td>
-    <td style="text-align:center"><input class="input data it-qty" placeholder="0" inputmode="decimal" style="width:70px;text-align:right;padding:6px"></td>
-    <td class="num data it-amt" style="font-weight:600;color:var(--basil-700)">—</td>
-    <td style="text-align:center"><input type="checkbox" ${it.vat ? 'checked' : ''} title="มี VAT (เคลมภาษีซื้อ)"></td>
+    <td data-label="ราคา/หน่วย"><div class="row" style="gap:3px;justify-content:flex-end"><span class="stk-note">฿</span><input class="input data it-price" value="${it.unitPrice}" style="width:62px;text-align:right;padding:6px"><span class="stk-note">/</span><input class="input it-unit" value="${esc(it.unit)}" style="width:56px;padding:6px;font-size:12px"></div></td>
+    <td data-label="จำนวน" style="text-align:center"><input class="input data it-qty" placeholder="0" inputmode="decimal" style="width:70px;text-align:right;padding:6px"></td>
+    <td data-label="เป็นเงิน" class="num data it-amt" style="font-weight:600;color:var(--basil-700)">—</td>
+    <td data-label="VAT" style="text-align:center"><input type="checkbox" ${it.vat ? 'checked' : ''} title="มี VAT (เคลมภาษีซื้อ)"></td>
   </tr>`;
 
   const empty = items.length === 0;
@@ -216,7 +216,7 @@ function itemizedPanel(cat) {
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">${esc(cat.name)}</div>
       ${cat.linksStock ? `<span class="pill pill-green">${icon('boxes', 13)} เข้าสต็อกอัตโนมัติ</span>` : ''}</div>
     <div class="section-sub">ราคา + หน่วย <b>กรอกอิสระ</b> (ใส่เท่าไร/หน่วยอะไรก็ได้) แล้ว<b>ค้างเป็น default</b> ไม่ต้องกรอกใหม่ทุกรอบ · กรอกแค่จำนวน → คูณให้อัตโนมัติ · ✓ = มี VAT</div>
-    <table class="tbl">
+    <table class="tbl tbl-stack">
       <thead><tr><th>รายการ</th><th style="text-align:right">ราคา / หน่วย</th><th style="text-align:center">จำนวน</th><th style="text-align:right">เป็นเงิน</th><th style="text-align:center">VAT</th></tr></thead>
       <tbody>${empty ? '' : groups.map((g) => `${g.name ? `<tr class="hb-grouprow"><td colspan="5">${esc(g.name)}</td></tr>` : ''}${g.items.map(itemRow).join('')}`).join('')}</tbody>
     </table>
@@ -237,9 +237,9 @@ function historyCard(cat) {
   return `<div class="card card-pad">
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="section-title">ประวัติ ${esc(cat.name)}</div><span class="pill pill-gray">รวม ${baht(total)}</span></div>
     ${mockTag('บันทึก/แก้ไขจริงในรอบ inline CRUD')}
-    <table class="tbl" style="margin-top:12px">
+    <table class="tbl tbl-stack" style="margin-top:12px">
       <thead><tr><th>วันที่</th><th>หมายเหตุ</th><th>ผู้บันทึก</th><th style="text-align:right">จำนวน</th><th></th></tr></thead>
-      <tbody>${rows.map((e) => `<tr><td class="data">${e.date}</td><td>${esc(e.note) || '<span style="color:var(--ink-3)">—</span>'}</td><td>${esc(state.db.users.find((u) => u.id === e.by)?.name || '')}</td><td class="num data" style="font-weight:600">${baht(e.amount)}</td><td style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">ยังไม่มีรายการ</div></td></tr>'}</tbody>
+      <tbody>${rows.map((e) => `<tr><td class="data">${e.date}</td><td data-label="หมายเหตุ">${esc(e.note) || '<span style="color:var(--ink-3)">—</span>'}</td><td data-label="ผู้บันทึก">${esc(state.db.users.find((u) => u.id === e.by)?.name || '')}</td><td data-label="จำนวน" class="num data" style="font-weight:600">${baht(e.amount)}</td><td data-label="" style="text-align:right"><button class="btn btn-ghost btn-sm">${icon('edit', 15)}</button></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">ยังไม่มีรายการ</div></td></tr>'}</tbody>
     </table>
   </div>`;
 }
