@@ -110,6 +110,8 @@ function doLoginUser(user) {
   S.tab = "home"; S.stack = [];
   save("session", S.user);
   renderChrome();
+  // โหลดข้อมูลใหม่ด้วยสิทธิ์ของผู้ที่ล็อกอิน (สำคัญหลังปิด RLS)
+  try { hydrateData(); } catch (_) {}
 }
 // login จริง: ตรวจ PIN ผ่าน authService → คืนผลให้หน้า login จัดการ feedback
 async function onLoginSubmit(pin) {
@@ -200,11 +202,11 @@ function renderContent() {
   }
 }
 
-// ---- demo / backend status strip ----
+// ---- backend status strip (โชว์เฉพาะตอนออฟไลน์/ยังไม่ตั้งค่า — ออนไลน์ = ซ่อน) ----
 function backendStripText() {
-  if (!backendConfigured()) return "เดโม · ข้อมูลตัวอย่าง — ยังไม่เชื่อมฐานข้อมูลจริง";
+  if (!backendConfigured()) return "ยังไม่ได้เชื่อมฐานข้อมูล — บันทึกในเครื่องชั่วคราว";
   return backendOnline()
-    ? "เชื่อมฐานข้อมูล Supabase แล้ว · ข้อมูลจริง สาขาพระราม 9"
+    ? ""
     : "ออฟไลน์ · ใช้ข้อมูลในเครื่องชั่วคราว — จะ sync เมื่อกลับมาออนไลน์";
 }
 

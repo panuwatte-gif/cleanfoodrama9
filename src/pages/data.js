@@ -51,8 +51,6 @@ export function dataScreen(ctx) {
   return h("div", { class: "page-wrap", "data-screen-label": "data" },
     hdr({ title: "ข้อมูล", sub: (shopCtx ? shopCtx.shop : "พระราม 9") + " · สต๊อก เมนู โภชนาการ — ชุดเดียวกับข้อมูลกลาง", right: shopCtx ? storeChip(shopCtx) : undefined }),
     h("div", { class: "page stack" },
-      note(["ทุกการ์ดในนี้ ", bold("link กับข้อมูลกลาง"), " — หมวด/ลำดับรายการเรียงเหมือนหน้านับ · สั่งของ · พยากรณ์ · ต้นทุน เป๊ะ"], { iconName: "db" }),
-
       linkCard(null, {
         iconName: "box", tintCls: "fill",
         title: "ระยะเวลาสินค้าคงเหลือ & อายุสินค้าเก่า",

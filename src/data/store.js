@@ -17,7 +17,7 @@
 import { load, save } from "../utils/storage.js";
 import {
   CATS_SEED, ITEMS_SEED, MENUS_SEED, ASSUMPTIONS_SEED, STOCK_SEED,
-  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED,
+  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED, RECIPES, MANUAL,
 } from "./seed.js";
 // background cloud sync (Supabase via api gateway). hydrateData is re-exported
 // below so the bootstrap has a single import point. scheduleSync() fires on
@@ -44,6 +44,10 @@ function fresh() {
     nutriIngr: clone(INGR_NUTRI),
     users: clone(USERS_SEED),
     tasks: clone(TASKS_SEED),
+    recipes: clone(RECIPES),
+    manual: clone(MANUAL),
+    income: [],
+    expense: [],
   };
 }
 
@@ -56,6 +60,10 @@ export function initData() {
   if (!db.nutriIngr) db.nutriIngr = clone(INGR_NUTRI);
   if (!db.users || !db.users.length) db.users = clone(USERS_SEED);
   if (!db.tasks) db.tasks = clone(TASKS_SEED);
+  if (!db.recipes || !db.recipes.length) db.recipes = clone(RECIPES);
+  if (!db.manual || !db.manual.length) db.manual = clone(MANUAL);
+  if (!db.income) db.income = [];
+  if (!db.expense) db.expense = [];
   // migration เฟส 6: โครงงาน/ข้อความใหม่ (status submitted · due · notice/note)
   // ถ้ายังเป็นชุด seed เก่า (t-seed*) → แทนด้วยชุดเดโมใหม่ทั้งก้อน
   if (db.tasks.some((t) => /^t-seed/.test(t.id))) db.tasks = clone(TASKS_SEED);
@@ -95,6 +103,10 @@ export function nutriMenu() { return initData().nutriMenu; }
 export function nutriIngr() { return initData().nutriIngr; }
 export function users() { return initData().users; }
 export function tasksRows() { return initData().tasks; }
+export function recipesRows() { return initData().recipes; }
+export function manualRows() { return initData().manual; }
+export function incomeRows() { return initData().income; }
+export function expenseRows() { return initData().expense; }
 
 // ---- async readers (หน้าจอใช้ตัวนี้ — คืน Promise เสมอ) ----
 export async function getCats() { return clone(cats()); }
@@ -222,6 +234,73 @@ export async function saveNutri(mode, id, data) {
 export async function removeNutri(mode, id) {
   const map = mode === "menu" ? nutriMenu() : nutriIngr();
   delete map[id];
+  persist(); bumpData();
+  return true;
+}
+
+// ---- สูตรอาหาร (recipes) — เจ้าของแก้สัดส่วน/ขั้นตอน + persist + sync ----
+export async function getRecipes() { return clone(recipesRows()); }
+export async function saveRecipe(rec) {
+  const list = recipesRows();
+  const i = list.findIndex((x) => x.id === rec.id);
+  if (i >= 0) list[i] = { ...list[i], ...rec };
+  else list.push({ ...rec });
+  persist(); bumpData();
+  return clone(rec);
+}
+export async function removeRecipe(id) {
+  const d = initData();
+  d.recipes = recipesRows().filter((r) => r.id !== id);
+  persist(); bumpData();
+  return true;
+}
+
+// ---- คู่มือพนักงาน (manual) — เจ้าของเพิ่ม/แก้/ลบ + persist + sync ----
+export async function getManual() { return clone(manualRows()); }
+export async function saveManualTopic(topic) {
+  const list = manualRows();
+  const i = list.findIndex((x) => x.id === topic.id);
+  if (i >= 0) list[i] = { ...list[i], ...topic };
+  else list.push({ ...topic });
+  persist(); bumpData();
+  return clone(topic);
+}
+export async function removeManualTopic(id) {
+  const d = initData();
+  d.manual = manualRows().filter((m) => m.id !== id);
+  persist(); bumpData();
+  return true;
+}
+
+// ---- รายได้ / ค่าใช้จ่าย (income / expense) — บันทึกจริง + sync ขึ้นคลาวด์ ----
+// upsert ตาม id (วัน+ช่องทาง/หมวด) — บันทึกซ้ำ = แก้ทับ
+export async function getIncome() { return clone(incomeRows()); }
+export async function saveIncomeRecord(rec) {
+  const list = incomeRows();
+  const i = list.findIndex((x) => x.id === rec.id);
+  if (i >= 0) list[i] = { ...list[i], ...rec };
+  else list.push({ ...rec });
+  persist(); bumpData();
+  return clone(rec);
+}
+export async function removeIncomeRecord(id) {
+  const d = initData();
+  d.income = incomeRows().filter((r) => r.id !== id);
+  persist(); bumpData();
+  return true;
+}
+export async function getExpense() { return clone(expenseRows()); }
+export async function saveExpenseRecord(rec) {
+  const list = expenseRows();
+  const i = list.findIndex((x) => x.id === rec.id);
+  if (i >= 0) list[i] = { ...list[i], ...rec };
+  else list.push({ ...rec });
+  persist(); bumpData();
+  return clone(rec);
+}
+export async function removeExpenseRecord(id) {
+  const d = initData();
+  d.expense = expenseRows().filter((r) => r.id !== id);
   persist(); bumpData();
   return true;
 }

@@ -36,13 +36,12 @@ export const rankOf = (u) => levelInfo(u && u.level).rank;
 export const isPlaceholderName = (name) => /^user\s*\d+$/i.test(String(name || "").trim());
 
 // ---- login ปกติผ่านเบราว์เซอร์ (PIN 4 หลัก) ----
-// ทางหลัก: ตรวจรหัสที่ "เซิร์ฟเวอร์" (edge function rama9-auth) — รหัสไม่หลุดมาเครื่อง
-// ทางสำรอง: ถ้าฟังก์ชันยังไม่พร้อม/เน็ตล่ม → ตรวจในเครื่องแบบเดิม (กันแอปล็อกอินไม่ได้)
 export async function login(pin) {
   const code = String(pin || "").trim();
   if (!/^\d{4}$/.test(code)) return { ok: false, reason: "notfound" };
 
-  if (supa.isConfigured()) {
+  // ทางหลัก: ตรวจรหัสที่ "เซิร์ฟเวอร์" (edge function rama9-auth) — รหัสไม่หลุดมาเครื่อง
+  if (supa.isConfigured && supa.isConfigured()) {
     try {
       const out = await supa.loginWithPin(code);
       if (out && typeof out.ok === "boolean") {
@@ -56,7 +55,7 @@ export async function login(pin) {
     }
   }
 
-  // ทางสำรอง (ออฟไลน์ / ฟังก์ชันยังไม่ deploy)
+  // ทางสำรอง (ออฟไลน์ / ฟังก์ชันยังไม่พร้อม)
   const user = await findUserByPin(code);
   if (!user) return { ok: false, reason: "notfound" };
   if (user.blocked) return { ok: false, reason: "blocked" };

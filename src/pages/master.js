@@ -292,7 +292,7 @@ function saveEdit(root) {
   st.edit = null; bumpData();
 }
 function delItem(root) {
-  // กันลบพลาด: ต้องใส่รหัสก่อน (0000)
+  // กันลบพลาด: ต้องใส่รหัสก่อน (9999)
   const e = st.edit;
   askPin(root, { title: 'ลบรายการ "' + e.name + '"', sub: "ใส่รหัสเพื่อยืนยันการลบ" }, () => {
     st.edit = null; st.pin = null;
@@ -318,7 +318,7 @@ function delCat(root) {
   });
 }
 
-// เปิด sheet ใส่รหัส (0000) ก่อนทำงานอันตราย เช่น ลบ
+// เปิด sheet ใส่รหัส (9999) ก่อนทำงานอันตราย เช่น ลบ
 function askPin(root, { title, sub }, onOk) {
   st.pin = { title, sub, onOk };
   renderSheets(root);

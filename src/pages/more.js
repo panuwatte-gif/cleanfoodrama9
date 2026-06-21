@@ -46,7 +46,6 @@ export function moreScreen(ctx = {}) {
   return h("div", { class: "page-wrap", "data-screen-label": "more" },
     h("div", { class: "page stack", style: { paddingTop: "14px" } },
       moreHero({ title: "เพิ่มเติม", sub: "ส่วนของเจ้าของทั้งหมด · จัดการร้านได้ครบ" }),
-      note([h("span", null, "แท็บนี้"), h("b", null, "พนักงานมองไม่เห็นเลย"), h("span", null, " (ไม่มีแม้แต่เงาจางๆ) — ทุกการแก้ไขข้อมูลขั้นสูงรวมอยู่ที่นี่")], { iconName: "lock" }),
 
       teamCard(ctx),
 
@@ -63,7 +62,6 @@ export function moreScreen(ctx = {}) {
         moreRow({ ic: "swap", emoji: "🔄", c: "teal", t: "แปลงหน่วย", s: "ความหมายหน่วยนับ + การเทียบ/แปลงหน่วยอัตโนมัติในระบบ", onClick: () => go({ name: "unitconvert" }) }),
         moreRow({ ic: "chefhat", emoji: "👩‍🍳", c: "violet", t: "แก้สูตรอาหาร", s: "สัดส่วน · ขั้นตอน · ล็อค/ปลดล็อคให้พนักงานดู", onClick: () => go({ name: "recipes" }) }),
       ),
-      note([h("span", null, "ต้นทุนวัตถุดิบ (฿/หน่วย) ย้ายไปรวมไว้ใน "), h("b", null, "ข้อมูลกลาง"), h("span", null, " ที่เดียวแล้ว — ไม่มีหลายจุดให้สับสน")], { iconName: "db" }),
 
       h("div", { class: "overline ov-amber" }, "รายงานเจ้าของ"),
       h("div", { class: "card more-card soft-amber" },
@@ -85,7 +83,7 @@ export function moreScreen(ctx = {}) {
       ),
 
       h("button", { type: "button", class: "btn btn-block", style: { marginTop: "4px", color: "var(--danger)" }, onClick: onLogout }, "ออกจากระบบ"),
-      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "12px 0 0" } }, "โคตรคลีน · สต๊อก — prototype demo · ข้อมูลตัวอย่างทั้งหมด"),
+      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "12px 0 0" } }, "คลัง & การดำเนินงาน · สาขาพระราม 9"),
     ),
   );
 }
@@ -126,7 +124,7 @@ export function accountScreen(ctx = {}) {
       ),
       note([h("span", null, "ส่วนของ"), h("b", null, "เจ้าของ"), h("span", null, " (ข้อมูลกลาง · ต้นทุน · กำไร · ตั้งค่า) ต้องเข้าด้วยรหัสเจ้าของ — พนักงานมองไม่เห็น")], { iconName: "lock" }),
       h("button", { type: "button", class: "btn btn-block", style: { marginTop: "4px", color: "var(--danger)" }, onClick: onLogout }, pi("arrowl", 16), "ออกจากระบบ"),
-      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "12px 0 0" } }, "โคตรคลีน · สต๊อก — prototype demo · ข้อมูลตัวอย่างทั้งหมด"),
+      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "12px 0 0" } }, "คลัง & การดำเนินงาน · สาขาพระราม 9"),
     ),
   );
 }

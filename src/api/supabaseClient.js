@@ -35,7 +35,6 @@ export function getClient() {
     _clientPromise = import(/* @vite-ignore */ SUPABASE_ESM)
       .then(({ createClient }) =>
         createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-          // เก็บ session ของผู้ที่ล็อกอินจริง (ผ่าน edge function) ไว้ข้ามรีเฟรช
           auth: { persistSession: true, autoRefreshToken: true, storageKey: "cfr9:sb-auth" },
         })
       )
@@ -115,7 +114,6 @@ export async function remove(tableKey, id) {
 // ============================================================
 const AUTH_FN_URL = () => `${CONFIG.SUPABASE_URL}/functions/v1/rama9-auth`;
 
-// เรียกฟังก์ชัน · useUserToken=true → แนบ token ของผู้ที่ล็อกอิน (สำหรับงานเจ้าของ)
 async function callAuthFn(payload, useUserToken = false) {
   let token = CONFIG.SUPABASE_ANON_KEY;
   if (useUserToken) {
@@ -150,12 +148,13 @@ export async function loginWithPin(pin) {
   return out;
 }
 
-// งานเจ้าของ (เซิร์ฟเวอร์บังคับสิทธิ์เอง — client เรียกได้แต่ถ้าไม่ใช่เจ้าของจะถูกปฏิเสธ)
-export const resetUserPin   = (target_id, new_pin) => callAuthFn({ action: "reset_pin", target_id, new_pin }, true);
-export const addUser        = (name, level, pin)   => callAuthFn({ action: "add_user", name, level, pin }, true);
-export const setUser        = (target_id, patch)   => callAuthFn({ action: "set_user", target_id, ...patch }, true);
-export const deleteUser     = (target_id)          => callAuthFn({ action: "delete_user", target_id }, true);
-export const changeOwnPin   = (old_pin, new_pin)   => callAuthFn({ action: "change_own_pin", old_pin, new_pin }, true);
+// งานเจ้าของ (เซิร์ฟเวอร์บังคับสิทธิ์เอง: ไม่ใช่เจ้าของจะถูกปฏิเสธ)
+export const resetUserPin = (target_id, new_pin) => callAuthFn({ action: "reset_pin", target_id, new_pin }, true);
+export const addUser      = (name, level, pin)   => callAuthFn({ action: "add_user", name, level, pin }, true);
+export const setUser      = (target_id, patch)   => callAuthFn({ action: "set_user", target_id, ...patch }, true);
+export const deleteUser   = (target_id)          => callAuthFn({ action: "delete_user", target_id }, true);
+export const changeOwnPin = (old_pin, new_pin)   => callAuthFn({ action: "change_own_pin", old_pin, new_pin }, true);
+export const setOwnName   = (name)               => callAuthFn({ action: "set_own_name", name }, true);
 
 export async function currentSession() {
   try { const sb = await getClient(); const { data } = await sb.auth.getSession(); return (data && data.session) || null; }

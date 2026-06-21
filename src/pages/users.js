@@ -27,6 +27,7 @@ import {
   tasksRows, addTask, setTaskStatus, removeTask,
 } from "../data/store.js";
 import { LEVELS, LEVEL_ORDER, levelInfo, rankOf, isPlaceholderName } from "../services/authService.js";
+import * as supa from "../api/supabaseClient.js";
 
 const LEVEL_TINT = { owner: "amber", lead: "violet", staff: "green" };
 const LEVEL_ICON = { owner: "shield", lead: "user", staff: "user" };
@@ -46,7 +47,7 @@ function pinInput(value) {
   inp.addEventListener("input", () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 4); });
   return inp;
 }
-const pwBadge = (pin) => h("span", { class: "pw-chip" }, pin);
+const pwBadge = () => h("span", { class: "pw-chip" }, "••••");
 
 // ---- ผู้ดู + กฎ ----
 function viewer() { const c = TS.ctx; return c && c.user ? (userById(c.user.id) || c.user) : null; }
@@ -115,7 +116,7 @@ function renderCard(wrap) {
           // โชว์ระดับเฉพาะมุมมองเจ้าของ (ไม่ broadcast ระดับให้พนักงาน)
           isOwner && h("span", { class: "user-row-sub" }, h("span", { class: "lvl-badge lvl-" + u.level }, levelInfo(u.level).label)),
         ),
-        pwBadge(u.pin),
+        pwBadge(),
         editable
           ? (() => { const c = pi("edit", 16); c.style.color = "var(--muted)"; c.style.marginLeft = "8px"; return c; })()
           : (() => { const c = pi("lock", 15); c.style.color = "var(--faint)"; c.style.marginLeft = "8px"; return c; })(),
@@ -162,8 +163,10 @@ function editBody(wrap) {
 
   const nameIn = h("input", { class: "input", type: "text", value: e.name, placeholder: "ชื่อผู้ใช้ (เช่น ออม)" });
   nameIn.addEventListener("input", () => { TS.edit.name = nameIn.value; });
-  const pinIn = pinInput(e.pin);
+  const pinIn = pinInput("");
   pinIn.addEventListener("input", () => { TS.edit.pin = pinIn.value; });
+  const oldPinIn = pinInput("");
+  oldPinIn.addEventListener("input", () => { TS.edit.oldPin = oldPinIn.value; });
 
   const levelSeg = showLevel ? seg({
     value: e.level, grow: true,
@@ -172,26 +175,72 @@ function editBody(wrap) {
   }) : null;
   const blockTgl = showManage ? toggle(!!e.blocked, (v) => { TS.edit.blocked = v; }) : null;
 
-  function save() {
+  async function save() {
     const name = (TS.edit.name || "").trim();
     const pin = (TS.edit.pin || "").trim();
+    const oldPin = (TS.edit.oldPin || "").trim();
     if (!name) { ctx.toast && ctx.toast("กรอกชื่อผู้ใช้ก่อน"); return; }
-    if (!/^\d{4}$/.test(pin)) { ctx.toast && ctx.toast("รหัสผ่านต้องเป็นตัวเลข 4 หลัก"); return; }
-    if (pinTaken(pin, e.id)) { ctx.toast && ctx.toast("รหัสผ่านนี้มีคนใช้แล้ว — เปลี่ยนเป็นรหัสอื่น"); return; }
-    const patch = { id: e.id, name, pin };
-    if (showLevel) patch.level = TS.edit.level;
-    else if (e.new) patch.level = "staff";
-    if (showManage || e.new) patch.blocked = !!TS.edit.blocked;
-    saveUser(patch);
-    TS.edit = null;
-    ctx.toast && ctx.toast(e.new ? "เพิ่มผู้ใช้แล้ว" : "บันทึกแล้ว");
+
+    // ผู้ใช้ใหม่ → เพิ่มผ่านเซิร์ฟเวอร์
+    if (e.new) {
+      if (!/^\d{4}$/.test(pin)) { ctx.toast && ctx.toast("รหัสผ่านต้องเป็นตัวเลข 4 หลัก"); return; }
+      const level = showLevel ? (TS.edit.level || "staff") : "staff";
+      const r = await supa.addUser(name, level, pin);
+      if (!r || !r.ok) { ctx.toast && ctx.toast((r && r.error) || "เพิ่มไม่สำเร็จ"); return; }
+      saveUser({ id: r.id, name, level, blocked: false });
+      TS.edit = null; renderSheets(wrap);
+      ctx.toast && ctx.toast("เพิ่มผู้ใช้แล้ว");
+      return;
+    }
+
+    // เจ้าของจัดการผู้อื่น/ตัวเอง
+    if (isOwner) {
+      const patch = { name };
+      if (showLevel) patch.level = TS.edit.level;
+      if (showManage) patch.blocked = !!TS.edit.blocked;
+      const r = await supa.setUser(e.id, patch);
+      if (!r || !r.ok) { ctx.toast && ctx.toast((r && r.error) || "บันทึกไม่สำเร็จ"); return; }
+      if (pin) {
+        if (!/^\d{4}$/.test(pin)) { ctx.toast && ctx.toast("รหัสใหม่ต้องเป็นเลข 4 หลัก"); return; }
+        const rp = await supa.resetUserPin(e.id, pin);
+        if (!rp || !rp.ok) { ctx.toast && ctx.toast((rp && rp.error) || "ตั้งรหัสไม่สำเร็จ"); return; }
+      }
+      saveUser({ id: e.id, name, ...(patch.level ? { level: patch.level } : {}), ...(showManage ? { blocked: !!TS.edit.blocked } : {}) });
+      TS.edit = null; renderSheets(wrap);
+      ctx.toast && ctx.toast("บันทึกแล้ว");
+      return;
+    }
+
+    // ไม่ใช่เจ้าของ → แก้บัญชีตัวเองเท่านั้น
+    if (self) {
+      const rn = await supa.setOwnName(name);
+      if (!rn || !rn.ok) { ctx.toast && ctx.toast((rn && rn.error) || "บันทึกไม่สำเร็จ"); return; }
+      if (pin) {
+        if (!/^\d{4}$/.test(pin)) { ctx.toast && ctx.toast("รหัสใหม่ต้องเป็นเลข 4 หลัก"); return; }
+        if (!/^\d{4}$/.test(oldPin)) { ctx.toast && ctx.toast("กรอกรหัสเดิมเพื่อยืนยัน"); return; }
+        const rp = await supa.changeOwnPin(oldPin, pin);
+        if (!rp || !rp.ok) { ctx.toast && ctx.toast((rp && rp.error) || "เปลี่ยนรหัสไม่สำเร็จ"); return; }
+      }
+      saveUser({ id: e.id, name });
+      TS.edit = null; renderSheets(wrap);
+      ctx.toast && ctx.toast("บันทึกแล้ว");
+      return;
+    }
   }
-  function del() { removeUser(e.id); TS.edit = null; ctx.toast && ctx.toast("ลบผู้ใช้แล้ว"); }
+  async function del() {
+    const r = await supa.deleteUser(e.id);
+    if (!r || !r.ok) { ctx.toast && ctx.toast((r && r.error) || "ลบไม่สำเร็จ"); return; }
+    removeUser(e.id); TS.edit = null; renderSheets(wrap);
+    ctx.toast && ctx.toast("ลบผู้ใช้แล้ว");
+  }
 
   const children = [
     h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "2px 0 0" } }, e.new ? "เพิ่มผู้ใช้" : (self ? "แก้ไขบัญชีของฉัน" : "จัดการ " + e.name)),
     h("label", { class: "field", style: { margin: 0 } }, h("span", { class: "field-label" }, "ชื่อผู้ใช้"), nameIn),
-    h("label", { class: "field", style: { margin: 0 } }, h("span", { class: "field-label" }, "รหัสผ่าน (4 หลัก)"), pinIn),
+    h("label", { class: "field", style: { margin: 0 } },
+      h("span", { class: "field-label" }, e.new ? "รหัสผ่าน (4 หลัก)" : "ตั้งรหัสใหม่ (เว้นว่าง = ไม่เปลี่ยน)"), pinIn),
+    (self && !isOwner) ? h("label", { class: "field", style: { margin: 0 } },
+      h("span", { class: "field-label" }, "รหัสเดิม (กรอกเมื่อจะเปลี่ยนรหัส)"), oldPinIn) : null,
   ];
   if (showLevel) children.push(h("div", null,
     h("div", { class: "field-label", style: { marginBottom: "6px" } }, "ระดับสิทธิ์"),

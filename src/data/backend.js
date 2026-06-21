@@ -22,7 +22,7 @@
 import * as api from "../api/apiClient.js";
 import {
   initData, bumpData, __adoptRemote,
-  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows,
+  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows, recipesRows, manualRows, incomeRows, expenseRows,
 } from "./store.js";
 
 // logical store collection → { gateway table key, storage kind }
@@ -34,8 +34,11 @@ const COLLECTIONS = [
   { coll: "stock",       key: "stockItems",          kind: "array", get: stockRows },
   { coll: "nutriMenu",   key: "nutritionMenu",       kind: "map",   get: nutriMenu },
   { coll: "nutriIngr",   key: "nutritionIngredient", kind: "map",   get: nutriIngr },
-  { coll: "users",       key: "users",               kind: "array", get: users },
+  { coll: "users",       key: "users",  readKey: "usersSafe", noPush: true, kind: "array", get: users },
   { coll: "tasks",       key: "tasks",               kind: "array", get: tasksRows },
+  { coll: "recipes",     key: "recipes",             kind: "array", get: recipesRows },
+  { coll: "income",      key: "incomeRecords",       kind: "array", get: incomeRows },
+  { coll: "expense",     key: "expenseRecords",      kind: "array", get: expenseRows },
 ];
 
 // Each row is stored as { id, data } — the whole object lives in the jsonb
@@ -65,11 +68,11 @@ export async function hydrateData() {
   if (!api.isConfigured()) return; // pure localStorage mode — nothing to do
   for (const d of COLLECTIONS) {
     let rows = null;
-    try { rows = await api.select(d.key); } catch { rows = null; }
+    try { rows = await api.select(d.readKey || d.key); } catch { rows = null; }
     if (rows && rows.length) {
       __adoptRemote(d.coll, shapeFromRows(d, rows));      // cloud wins
       lastIds[d.coll] = new Set(rows.map((r) => r.id));
-    } else if (api.isOnline()) {
+    } else if (api.isOnline() && !d.noPush) {
       const local = rowsFor(d);                            // cloud empty but online → seed it
       if (local.length) { try { await api.upsertMany(d.key, local); } catch { /* ignore */ } }
       lastIds[d.coll] = new Set(local.map((r) => r.id));
@@ -89,6 +92,7 @@ export function scheduleSync() {
 async function syncNow() {
   if (!api.isConfigured()) return;
   for (const d of COLLECTIONS) {
+    if (d.noPush) continue;            // users ไม่ push (จัดการผ่าน edge function)
     const rows = rowsFor(d);
     try {
       await api.upsertMany(d.key, rows);

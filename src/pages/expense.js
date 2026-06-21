@@ -11,6 +11,7 @@ import { hdr, note, qtyInput, emptyState, dateBar, itemIc, emo } from "../compon
 import { storeChip } from "../components/layout.js";
 import { fmt, itemsOf, catById, unitOf } from "../utils/formulas.js";
 import { MONEY, EXP_INV_CAT, TODAY } from "../data/seed.js";
+import { saveExpenseRecord } from "../data/store.js";
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
@@ -77,7 +78,7 @@ function paint(root) {
   const chips = MONEY.expCats.map((c) => h("button", {
     type: "button", class: "chip" + (cat === c ? " active" : ""), onClick: () => { est.cat = c; paint(root); },
   }, EXP_INV_CAT[c] && emo(catById(EXP_INV_CAT[c]).icon, { s: 12 }), c));
-  chips.push(h("button", { type: "button", class: "chip", style: { color: "var(--muted)" }, onClick: () => toast("เดโม — เพิ่มหมวดค่าใช้จ่ายใหม่") }, pi("plus", 12), " เพิ่มหมวด"));
+  chips.push(h("button", { type: "button", class: "chip", style: { color: "var(--muted)" }, onClick: () => toast("เพิ่ม/จัดการหมวดได้ที่ ข้อมูลกลาง") }, pi("plus", 12), " เพิ่มหมวด"));
 
   let body, foot;
   if (invCatId) {
@@ -95,21 +96,27 @@ function paint(root) {
           h("div", { style: { paddingBottom: "6px" } }, invItems.map(invRow)),
         )];
     body = [
-      note(["กรอกจำนวนที่ซื้อ", bold("เหมือนหน้าตรวจนับ"), " · รายการ/ราคา link จาก", bold("ข้อมูลกลาง"), " — ราคาขึ้นได้ แก้ช่อง ", bold("฿/หน่วย"), " ได้เลย (อัปเดตเข้าข้อมูลกลางด้วย)"], { iconName: "box" }),
+      note(["กรอกจำนวนที่ซื้อแต่ละรายการ — ราคาต่อหน่วยปรับได้ที่ช่อง ", bold("฿/หน่วย")], { iconName: "box" }),
       ...groups,
-      h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เดโม — เพิ่มรายการในหมวด" + cat + " (เข้าข้อมูลกลางด้วย)") }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
+      h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เพิ่มรายการใหม่ได้ที่ ข้อมูลกลาง (เพิ่มเติม)") }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
     ];
-    saveBtn.addEventListener("click", () => { const { total } = recompute(); toast("บันทึก" + cat + " " + est.day + " มิ.ย. ฿" + fmt(Math.round(total)) + " แล้ว"); back(); });
+    saveBtn.addEventListener("click", () => {
+      const { total, filled } = recompute();
+      const lines = invItems.filter((it) => est.packQty[it.id]).map((it) => ({ id: it.id, name: it.name, qty: num(est.packQty[it.id]), cost: costOf(it) }));
+      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat, day: est.day, cat, kind: "inventory", amount: Math.round(total), count: filled, lines, at: new Date().toISOString() });
+      toast("บันทึก" + cat + " " + est.day + " มิ.ย. ฿" + fmt(Math.round(total)) + " — บันทึกขึ้นคลาวด์แล้ว"); back();
+    });
     foot = h("div", { class: "foot" }, h("div", { style: { flex: 1 } }, footCount, footTotal), saveBtn);
   } else {
     const amtIn = h("input", { type: "text", inputMode: "numeric", class: "input tnum", style: { fontSize: "22px", fontWeight: 700 }, placeholder: "0", value: est.amt });
     amtIn.addEventListener("input", () => { const s = amtIn.value.replace(/[^0-9]/g, ""); if (s !== amtIn.value) amtIn.value = s; est.amt = s; blockSave.disabled = !est.amt; blockSave.style.opacity = est.amt ? 1 : .45; });
+    const detailIn = h("input", { type: "text", class: "input", placeholder: "เช่น " + (cat === "ค่าเช่า" ? "ค่าเช่ารายเดือน" : "ค่า" + cat + "รอบเดือนนี้") });
     const savedRows = est.day === TODAY.d
       ? MONEY.todayExp.map((e) => h("div", { class: "rowflex", style: { padding: "10px 0" } },
           h("span", { class: "catic blue sm" }, pi("box", 15)),
           h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: { fontSize: "13.5px", fontWeight: 600 } }, e.cat), h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, e.note)),
           h("span", { class: "tnum", style: { fontWeight: 700 } }, "฿" + fmt(e.amt)),
-          h("button", { type: "button", class: "hdr-icon", style: { width: "30px", height: "30px" }, "aria-label": "แก้ไข", onClick: () => toast("เดโม — แก้รายการนี้") }, pi("edit", 14)),
+          h("button", { type: "button", class: "hdr-icon", style: { width: "30px", height: "30px" }, "aria-label": "แก้ไข", onClick: () => toast("แก้รายการได้จากหน้าประวัติการบันทึก") }, pi("edit", 14)),
         ))
       : [emptyState({ compact: true, iconName: "box", title: "ยังไม่มีบันทึกหมวดนี้", sub: "วันที่ " + est.day + " มิ.ย. · เพิ่มรายการด้านบน" })];
     body = [
@@ -121,15 +128,18 @@ function paint(root) {
         h("div", { class: "rowflex", style: { gap: "8px" } }, amtIn, h("span", { style: { fontSize: "13px", color: "var(--muted)", flex: "none" } }, "บาท")),
         h("div", { class: "field", style: { margin: "12px 0 0" } },
           h("span", { class: "field-label" }, "รายละเอียด"),
-          h("input", { type: "text", class: "input", placeholder: "เช่น " + (cat === "ค่าเช่า" ? "ค่าเช่ารายเดือน" : "ค่า" + cat + "รอบเดือนนี้") }),
+          detailIn,
         ),
       ),
-      h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เดโม — เพิ่มรายการย่อยในหมวด" + cat) }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
+      h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เพิ่มรายการใหม่ได้ที่ ข้อมูลกลาง (เพิ่มเติม)") }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
       h("div", { class: "overline" }, "บันทึกแล้ว · " + est.day + " มิ.ย."),
       h("div", { class: "card", style: { padding: "4px 16px" } }, ...savedRows),
     ];
     const blockSave = h("button", { type: "button", class: "btn btn-primary btn-block", disabled: !est.amt, style: { opacity: est.amt ? 1 : .45 } }, pi("check", 17), "บันทึก");
-    blockSave.addEventListener("click", () => { toast("บันทึก" + cat + " · " + est.day + " มิ.ย. ฿" + fmt(num(est.amt)) + " แล้ว"); back(); });
+    blockSave.addEventListener("click", () => {
+      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat + "-" + Date.now(), day: est.day, cat, kind: "amount", amount: num(est.amt), note: detailIn.value.trim(), at: new Date().toISOString() });
+      toast("บันทึก" + cat + " · " + est.day + " มิ.ย. ฿" + fmt(num(est.amt)) + " — บันทึกขึ้นคลาวด์แล้ว"); back();
+    });
     foot = h("div", { class: "foot" }, h("button", { type: "button", class: "btn btn-block", onClick: back }, "ยกเลิก"), blockSave);
   }
 

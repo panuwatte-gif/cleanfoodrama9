@@ -22,6 +22,7 @@ import {
   nameOf, isNotice, isOverdue, isDueToday,
 } from "../utils/messages.js";
 import { STOCK_SEED, MONEY, TODAY, branchDailySales } from "../data/seed.js";
+import { incomeRows, expenseRows } from "../data/store.js";
 
 const DOW_FULL = { "จ.": "จันทร์", "อ.": "อังคาร", "พ.": "พุธ", "พฤ.": "พฤหัสบดี", "ศ.": "ศุกร์", "ส.": "เสาร์", "อา.": "อาทิตย์" };
 const MON_FULL = { "ม.ค.": "มกราคม", "ก.พ.": "กุมภาพันธ์", "มี.ค.": "มีนาคม", "เม.ย.": "เมษายน", "พ.ค.": "พฤษภาคม", "มิ.ย.": "มิถุนายน", "ก.ค.": "กรกฎาคม", "ส.ค.": "สิงหาคม", "ก.ย.": "กันยายน", "ต.ค.": "ตุลาคม", "พ.ย.": "พฤศจิกายน", "ธ.ค.": "ธันวาคม" };
@@ -62,16 +63,20 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
   return h("div", { class: "page-wrap", "data-screen-label": "home" },
     // แถบบน
     h("div", { class: "home-top" },
-      h("span", { class: "home-logo" }, mascot(40, { spark: true })),
-      h("div", { class: "home-top-tt" },
-        h("h1", null, "คลัง & การดำเนินงาน"),
-        h("p", null, "จัดการสต๊อก · ออเดอร์ · ทีมงาน"),
+      h("div", { class: "home-top-main" },
+        h("span", { class: "home-logo" }, mascot(40, { spark: true })),
+        h("div", { class: "home-top-tt" },
+          h("h1", null, "คลัง & การดำเนินงาน"),
+          h("p", null, "จัดการสต๊อก · ออเดอร์ · ทีมงาน"),
+        ),
       ),
-      storeChip(shopCtx),
-      h("button", { type: "button", class: "bell-btn mail-btn", "aria-label": "งานและข้อความ", onClick: () => go({ name: "messages" }) },
-        pi("mail", 19), mailCount > 0 && h("span", { class: "bdot" }, String(mailCount))),
-      h("button", { type: "button", class: "bell-btn", "aria-label": "การแจ้งเตือน", onClick: () => toast && toast(openInbox ? ("มีงานค้าง " + openInbox + " รายการ") : "ไม่มีงานค้าง") },
-        pi("bell", 19), openInbox > 0 && h("span", { class: "bdot" }, String(openInbox))),
+      h("div", { class: "home-top-actions" },
+        storeChip(shopCtx),
+        h("button", { type: "button", class: "bell-btn mail-btn", "aria-label": "งานและข้อความ", onClick: () => go({ name: "messages" }) },
+          pi("mail", 19), mailCount > 0 && h("span", { class: "bdot" }, String(mailCount))),
+        h("button", { type: "button", class: "bell-btn", "aria-label": "การแจ้งเตือน", onClick: () => toast && toast(openInbox ? ("มีงานค้าง " + openInbox + " รายการ") : "ไม่มีงานค้าง") },
+          pi("bell", 19), openInbox > 0 && h("span", { class: "bdot" }, String(openInbox))),
+      ),
     ),
 
     h("div", { class: "page stack" },
@@ -196,7 +201,14 @@ function helperTile(go, tintCls, ic, name, sub, link, route) {
 function ownerSalesBlock(go, shopCtx) {
   const names = shopCtx && shopCtx.shops ? shopCtx.shops.map((s) => s.name) : ["ร้านหลัก"];
   const data = branchDailySales(names);
-  const net = MONEY.monthIncome - MONEY.monthExpense;
+  // คำนวณจากรายการจริงที่บันทึกไว้ (income/expense) — ถ้ายังไม่มีจึงใช้ค่าตั้งต้น
+  const inc = incomeRows(), exp = expenseRows();
+  const hasReal = inc.length > 0 || exp.length > 0;
+  const realNet = inc.reduce((s, r) => s + (r.net || 0), 0) - exp.reduce((s, r) => s + (r.amount || 0), 0);
+  const net = hasReal ? realNet : (MONEY.monthIncome - MONEY.monthExpense);
+  const netStr = (net >= 0 ? "+฿" : "−฿") + fmt(Math.abs(net));
+  const todayInc = inc.filter((r) => r.day === TODAY.d).reduce((s, r) => s + (r.gross || 0), 0);
+  const todayTotal = todayInc > 0 ? todayInc : data.todayTotal;
 
   const statCard = (cls, icCls, ic, label, num, sub, route) =>
     h("button", { type: "button", class: "stat-card " + cls + " list-press", onClick: () => go({ name: route }) },
@@ -228,14 +240,12 @@ function ownerSalesBlock(go, shopCtx) {
         sel,
       ),
       branchCombo({ days, branches: data.branches, h: 168, fmt }),
-      h("div", { class: "combo-legend" },
-        data.branches.map((b) => h("span", null,
-          h("i", { style: { background: b.color, width: "10px", height: "10px", borderRadius: "3px" } }), b.name)),
-      ),
       h("div", { class: "sales-branches" },
         data.today.map((b) => h("div", { class: "sb-chip" },
-          h("span", { class: "sb-dot", style: { background: b.color } }),
-          h("span", { class: "sb-name" }, b.name),
+          h("span", { class: "sb-top" },
+            h("span", { class: "sb-dot", style: { background: b.color } }),
+            h("span", { class: "sb-name" }, b.name),
+          ),
           h("span", { class: "sb-val tnum" }, "฿" + fmt(b.today)),
         )),
       ),
@@ -247,8 +257,8 @@ function ownerSalesBlock(go, shopCtx) {
 
   return [
     h("div", { class: "stat-pair" },
-      statCard("sc-sales", "", "trend", "ยอดขายทุกสาขาวันนี้", "฿" + fmt(data.todayTotal), data.branches.length + " สาขา · " + TODAY.d + " " + TODAY.mon, "execsummary"),
-      statCard("sc-net", "net", "wallet", "ยอดสุทธิเดือนนี้", "+฿" + fmt(net), "รายได้ − ค่าใช้จ่าย = กำไร", "money"),
+      statCard("sc-sales", "", "trend", "ยอดขายทุกสาขาวันนี้", "฿" + fmt(todayTotal), data.branches.length + " สาขา · " + TODAY.d + " " + TODAY.mon, "execsummary"),
+      statCard("sc-net", "net", "wallet", "ยอดสุทธิเดือนนี้", netStr, "รายได้ − ค่าใช้จ่าย = กำไร", "money"),
     ),
     chartCard,
   ];

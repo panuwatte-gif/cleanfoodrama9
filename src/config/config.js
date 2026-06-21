@@ -14,7 +14,6 @@ export const CONFIG = {
   DEFAULT_BRANCH_CODE: "rama9",
 
   // รหัสยืนยันก่อน "ลบ" รายการ/หมวด/ค่ากลาง (กันลบพลาด) — แก้ที่นี่ที่เดียว
-  // หมายเหตุ: ตั้งใจให้ไม่ซ้ำกับ PIN ล็อกอินของผู้ใช้คนใด
   DELETE_CONFIRM_PIN: "0000",
 
   // --- Backend (Supabase project "Stock Tracker") ---
@@ -22,7 +21,7 @@ export const CONFIG = {
   // Empty either field → app runs fully on localStorage (offline mode).
   SUPABASE_URL: "https://qxhvmrxbrrweundfspzp.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4aHZtcnhicnJ3ZXVuZGZzcHpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTY1NjYsImV4cCI6MjA5MDczMjU2Nn0.OibDQzDrFvoV0-a7EH97ynBKCBfFwXXAyv6vlMtH0t0",
-  REPORT_WEBHOOK_URL: "", // LINE / make.com webhook for sending order & report messages
+  REPORT_WEBHOOK_URL: "https://qxhvmrxbrrweundfspzp.supabase.co/functions/v1/rama9-line", // edge function ส่ง LINE (อ่าน token จาก env ฝั่งเซิร์ฟเวอร์)
 
   // --- LIFF (LINE Front-end Framework) ---
   // ENABLED=false → behaves as a normal webapp, must never error for a
@@ -59,7 +58,9 @@ export const CONFIG = {
     settings: "rama9_settings",
     editLogs: "rama9_edit_logs",              // audit trail of every retroactive edit
     users: "rama9_users",
+    usersSafe: "rama9_users_safe",      // อ่านรายชื่อแบบไม่มีรหัส (หลังปิด RLS)
     tasks: "rama9_tasks",                     // งานที่มอบหมาย + โน้ต/ประกาศ (assignee/assigner)
+    manual: "rama9_manual",                   // คู่มือพนักงาน (เจ้าของแก้/เพิ่ม/ลบ)
   },
 
   // Storage bucket for expense receipt images (Supabase Storage, private).

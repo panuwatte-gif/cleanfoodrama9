@@ -16,6 +16,7 @@
 // ============================================================
 
 import { CONFIG } from "../config/config.js";
+import { currentSession } from "../api/supabaseClient.js";
 
 // webhook is usable only when the feature is on AND a URL is set
 function ready() {
@@ -27,9 +28,16 @@ function ready() {
 async function postWebhook(payload) {
   if (!ready()) return { ok: false, skipped: true, reason: "no-webhook" };
   try {
+    // แนบ token ของผู้ที่ล็อกอิน — edge function ยอมให้เฉพาะผู้ใช้จริงสั่งส่ง
+    let bearer = CONFIG.SUPABASE_ANON_KEY;
+    try { const ses = await currentSession(); if (ses && ses.access_token) bearer = ses.access_token; } catch (_) {}
     const res = await fetch(CONFIG.REPORT_WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        apikey: CONFIG.SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + bearer,
+      },
       body: JSON.stringify({
         app: "CleanFoodRama9",
         branch: CONFIG.DEFAULT_BRANCH_CODE,
