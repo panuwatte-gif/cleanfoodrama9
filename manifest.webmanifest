@@ -1,37 +1,19 @@
 {
-  "name": "Rama9 Ops — กะเพราโคตรคลีน",
-  "short_name": "Rama9 Ops",
-  "description": "ระบบปฏิบัติการร้านกะเพราโคตรคลีน สำหรับใช้งานบนมือถือและเดสก์ท็อป",
-  "start_url": "./index.html",
-  "scope": "./",
+  "name": "โคตรคลีน · ระบบสต๊อก",
+  "short_name": "โคตรคลีน",
+  "description": "ระบบจัดการสต๊อก/รับของ ร้านกะเพราโคตรคลีน สาขาพระราม 9",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#101510",
-  "theme_color": "#101510",
+  "orientation": "portrait",
+  "background_color": "#F6F7F4",
+  "theme_color": "#0F7A35",
+  "categories": ["business", "productivity", "food"],
   "icons": [
-    {
-      "src": "assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "assets/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "assets/icon-maskable-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "assets/icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

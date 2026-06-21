@@ -1,32 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#101510">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Rama9 Ops">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <title>Rama9 Ops — กะเพราโคตรคลีน</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
-  <link rel="stylesheet" href="css/app.css?v=19">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0F7A35" />
+<meta name="description" content="ระบบจัดการสต๊อก/รับของ ร้านกะเพราโคตรคลีน สาขาพระราม 9" />
+<title>CleanFoodRama9 · ระบบสต๊อกโคตรคลีน</title>
+
+<!-- PWA: ติดไอคอนหน้าจอ + เปิดเต็มจอเหมือนแอป -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="โคตรคลีน" />
+
+<!-- 1) design tokens (KodKlean House)  2) cookbook ui kit  3) prototype styles
+     โหลดตามลำดับนี้เสมอ — proto.css override cookbook, cookbook ใช้ tokens -->
+<link rel="stylesheet" href="_ds/colors_and_type.css" />
+<link rel="stylesheet" href="css/cookbook.css" />
+<link rel="stylesheet" href="css/proto.css" />
 </head>
 <body>
   <div id="app"></div>
-  <script src="image-slot.js"></script>
-  <script type="module" src="js/app.js?v=19"></script>
+
+  <!-- Vanilla ES modules — ไม่มี build step เปิดไฟล์รันได้ตรงๆ -->
+  <script type="module" src="src/app.js"></script>
+
+  <!-- PWA service worker (cache-first app shell) — try/catch กันพังบนเบราว์เซอร์เก่า -->
   <script>
-    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
       });
     }
   </script>

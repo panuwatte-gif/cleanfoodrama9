@@ -1,0 +1,244 @@
+/* ============================================================
+   โคตรคลีน · KodKlean House — Design Tokens
+   A multi-brand healthy food-science house (Thailand).
+   โคตรคลีน (KodKlean) is the HOLDING / parent brand; under it sit
+   four product brands: กะเพราโคตรคลีน, 5% ข้าวมันไก่, Re:Drink,
+   ลูกสาวทำเอง. One green spine on warm neutral + a neutral holding
+   tone + four brand accent skins. Derived from the Recipe App +
+   Capture PWA codebases and the brand asset library.
+   ============================================================ */
+
+/* ---- Webfonts (CDN — codebases load these from Google Fonts) ---- */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Trirong:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Mali:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500&display=swap");
+
+:root {
+  /* ========================================================
+     HOUSE PALETTE — basil green on warm neutral
+     The shared spine across every brand & every internal tool.
+     ======================================================== */
+
+  /* Warm neutral surfaces */
+  --bg:            #F6F7F4;   /* app background */
+  --bg-deep:       #EFF1EC;   /* sunk / track */
+  --surface:       #FFFFFF;   /* cards */
+  --surface-soft:  #F3F7F1;   /* tinted surface */
+  --surface-tint:  #FAFAF8;   /* hover surface */
+  --cream:         #F4EFE3;   /* brand cream (badges, 5% ivory) */
+
+  /* Ink */
+  --text:          #111827;   /* primary ink */
+  --text-2:        #374151;   /* secondary ink */
+  --muted:         #6B7280;   /* tertiary */
+  --faint:         #9CA3AF;   /* quaternary / placeholder */
+
+  /* House basil green (primary) */
+  --primary:       #16A34A;   /* house green */
+  --primary-dark:  #0F7A35;   /* pressed / deep */
+  --primary-deep:  #047857;   /* theme-color, darkest */
+  --primary-soft:  #DCFCE7;   /* tint fill */
+  --primary-ink:   #14532D;   /* on-tint text */
+  --primary-tint:  #ECFDF3;   /* faintest wash */
+
+  /* Lines */
+  --border:        #E7E9E3;
+  --border-soft:   #EEF0EA;
+
+  /* Status (shared) */
+  --warning:       #F59E0B;  --warning-soft: #FEF3C7;  --warning-ink: #92400E;
+  --danger:        #EF4444;  --danger-soft:  #FEE2E2;  --danger-ink:  #991B1B;
+  --info:          #2563EB;  --info-soft:    #DBEAFE;  --info-ink:    #1E40AF;
+  --review:        #E0A93B;  /* amber review */
+  --dup:           #8A7FD0;  /* violet duplicate */
+
+  /* Tinted card washes */
+  --tint-green:    #ECFDF3;
+  --tint-amber:    #FFF7E6;
+  --tint-blue:     #EFF4FE;
+  --tint-rose:     #FFF1F2;
+  --tint-violet:   #F3F0FE;
+
+  /* ========================================================
+     RADIUS  (rounded, friendly — never sharp)
+     ======================================================== */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 24px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* ========================================================
+     SHADOW  (soft, low-contrast, cool-grey — never harsh)
+     ======================================================== */
+  --shadow-xs: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 2px 6px rgba(15,23,42,0.04);
+  --shadow-md: 0 6px 18px rgba(15,23,42,0.06), 0 2px 4px rgba(15,23,42,0.04);
+  --shadow-lg: 0 18px 40px rgba(15,23,42,0.14), 0 4px 12px rgba(15,23,42,0.08);
+  --shadow-nav: 0 8px 32px rgba(15,23,42,0.10), 0 2px 6px rgba(15,23,42,0.05);
+  --shadow-brand: 0 8px 22px rgba(22,163,74,0.30);
+
+  /* ========================================================
+     SPACING  (4px base grid)
+     ======================================================== */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
+
+  /* ========================================================
+     TYPE — families
+     ======================================================== */
+  /* UI / body. IBM Plex Sans Thai is the workhorse (Recipe App). */
+  --font-ui:    "IBM Plex Sans Thai", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Alt Thai body — slightly warmer, used in the Capture PWA */
+  --font-thai:  "Noto Sans Thai", "IBM Plex Sans Thai", system-ui, sans-serif;
+  /* Latin & tabular numerals */
+  --font-num:   "Inter", "IBM Plex Sans Thai", sans-serif;
+  /* Mono — codes, IDs, timestamps */
+  --font-mono:  "Spline Sans Mono", ui-monospace, "SF Mono", monospace;
+  /* Premium serif display — the 5% Chicken Rice voice */
+  --font-serif: "Trirong", "Noto Serif Thai", Georgia, serif;
+  /* Hand / script — the ลูกสาวทำเอง (Daughter Made It) warmth */
+  --font-script:"Mali", "IBM Plex Sans Thai", cursive;
+
+  /* TYPE — semantic scale (mobile-first product UI) */
+  --display:   800 34px/1.1   var(--font-ui);
+  --h1:        700 24px/1.2   var(--font-ui);
+  --h2:        700 18px/1.25  var(--font-ui);
+  --h3:        700 16px/1.3   var(--font-ui);
+  --title:     700 15px/1.35  var(--font-ui);
+  --body:      400 15px/1.55  var(--font-ui);
+  --body-sm:   400 13px/1.5   var(--font-ui);
+  --label:     600 12px/1.3   var(--font-ui);
+  --overline:  700 11px/1.3   var(--font-ui);  /* + letter-spacing .06em, uppercase */
+  --num-lg:    800 26px/1.1   var(--font-num); /* stat numerals, tabular */
+  --caption:   500 12px/1.4   var(--font-ui);
+
+  /* Letter-spacing */
+  --tracking-tight: -0.02em;  /* headings */
+  --tracking-body:  -0.005em; /* body */
+  --tracking-wide:  0.06em;   /* overlines / labels */
+}
+
+/* ============================================================
+   HOLDING / PARENT — โคตรคลีน · KodKlean
+   The umbrella brand. Use this neutral, corporate tone for any
+   surface that sits ABOVE the individual brands — the group
+   overview, a consolidated financial-report webapp, the landing
+   that shows brand cards to drill into, investor / about pages.
+   It reads: healthy, trustworthy, refined, data-friendly. One
+   step calmer and more "evergreen" than the punchy basil green,
+   with a gold hairline that ties every sub-brand together.
+   ============================================================ */
+.brand-holding,
+:root {
+  --hold-primary:   #128A5A;  /* refined evergreen — corporate */
+  --hold-deep:      #0B5C3C;  /* darkest, headers / ink-on-light */
+  --hold-bright:    #2FB179;  /* hover / highlight */
+  --hold-soft:      #E2F3EA;  /* tint fill */
+  --hold-ink:       #12241C;  /* near-black green ink */
+  --hold-accent:    #C7A249;  /* house gold — the connective thread */
+  --hold-accent-dk: #9A7A2E;
+  --hold-surface:   #F7F8F5;  /* cool-warm corporate paper */
+  --hold-panel:     #FFFFFF;
+  --hold-slate:     #5B6B63;  /* muted text for data UIs */
+  --hold-line:      #E4E8E3;
+}
+
+/* ============================================================
+   BRAND ACCENT SKINS
+   Apply a class to a wrapper to retint a surface for one brand.
+   The holding green is the neutral default; brands layer ON TOP.
+   Every brand keeps a HEALTHY signal (a green anchor or fresh
+   surface) no matter how premium / vivid / pastel it gets.
+   ============================================================ */
+
+/* 1 — กะเพราโคตรคลีน  (flagship · value clean food)
+   Official identity palette. Deep forest + emerald on soft cream,
+   warm gold accent, fresh-leaf bright. Natural, clean, generous. */
+.brand-kaprao {
+  --b-primary:    #4E8F66;   /* Emerald Green — main */
+  --b-primary-dk: #3B6B4F;   /* Deep Forest */
+  --b-bright:     #A7C97A;   /* Fresh Leaf — lively highlight */
+  --b-soft:       #E7F0E2;
+  --b-accent:     #C8A557;   /* Warm Gold */
+  --b-ink:        #2C3F31;
+  --b-surface:    #F5F2E8;   /* Soft Cream */
+  --b-font-disp:  var(--font-ui);
+}
+
+/* 2 — 5% ข้าวมันไก่  (premium · scientific · healthy)
+   Official identity palette. Luxury gold on DEEP EMERALD — the green
+   stage is itself the honest "healthy" tell beneath the luxury.
+   High self-contrast (gold ⇄ deep green/charcoal), fully cohesive. */
+.brand-5pct {
+  --b-primary:    #D4AF37;   /* Luxury Gold — main */
+  --b-primary-dk: #A9892A;   /* deep antique gold */
+  --b-bright:     #E8D08A;   /* gilt highlight */
+  --b-accent:     #135B43;   /* Jade Green — the healthy tell */
+  --b-ink:        #1A1A1A;   /* Charcoal */
+  --b-surface:    #0A2B21;   /* Deep Emerald stage */
+  --b-ivory:      #F7F4EC;   /* Ivory White / negative-space bg */
+  --b-font-disp:  var(--font-serif);
+}
+
+/* 3 — Re:Drink  (functional drinks · MOST scientific)
+   Official identity palette. MAIN IS TEAL — a teal→ocean-cyan base,
+   with a vivid functional rainbow (one colour per function/flavour)
+   echoing the molecular-swoosh logo. Lab-bright, bold, credible. */
+.brand-redrink {
+  --b-primary:    #0B5D6B;   /* Deep Teal — MAIN */
+  --b-primary-dk: #084551;
+  --b-bright:     #1296A3;   /* Ocean Cyan */
+  --b-turq:       #21B7B5;   /* Turquoise */
+  --b-soft:       #E3F2F3;
+  --b-ink:        #08323A;
+  --b-surface:    #F4FAFB;   /* cool fresh wash */
+  /* functional spectrum — pick per drink / data series */
+  --b-orange:     #FF8A1C;   /* Vital Orange — energy / citrus */
+  --b-yellow:     #FFD23F;   /* Sunshine Yellow — vitamin C */
+  --b-lime:       #8AC640;   /* Lime Green — detox / greens */
+  --b-berry:      #C03A8C;   /* Magenta Berry — antioxidant */
+  --b-accent:     var(--b-turq);
+  --b-font-disp:  var(--font-ui);
+}
+
+/* 4 — ลูกสาวทำเอง  (warm · sincere · premium-homemade)
+   Official identity palette. Soft, varied PASTELS on cream with a
+   cocoa-brown/charcoal hand-drawn ink for the mascot line art.
+   Gentle, nostalgic, never loud. */
+.brand-luksao {
+  --b-primary:    #A8C7A1;   /* Sage Green — main calm anchor */
+  --b-primary-dk: #8B5E3C;   /* Cocoa Brown — depth / line accents */
+  --b-ink:        #333333;   /* Charcoal — doodle line art */
+  --b-accent:     #F5C6C6;   /* Blush Pink — signature warmth */
+  --b-surface:    #FFF7EC;   /* Cream Ivory */
+  --b-beige:      #EADBC6;   /* Warm Beige */
+  /* pastel accent skins — rotate across menus / categories */
+  --b-blush:      #F5C6C6;   /* Coral Delight */
+  --b-peach:      #FFC8A6;   /* Soft Peach / Terracotta */
+  --b-lemon:      #FCE7A0;   /* Lemon Zest */
+  --b-mint:       #CDE7D0;   /* Mint / Green Garden */
+  --b-lavender:   #D8CCE8;   /* Lavender Touch */
+  --b-sky:        #C6E0EC;   /* Sky Breeze */
+  --b-font-disp:  var(--font-script);
+}
+
+/* ============================================================
+   Base element defaults (optional reset for previews)
+   ============================================================ */
+body.kk-base {
+  font: var(--body);
+  color: var(--text);
+  background: var(--bg);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.kk-base h1 { font: var(--h1); letter-spacing: var(--tracking-tight); margin: 0; }
+.kk-base h2 { font: var(--h2); letter-spacing: var(--tracking-tight); margin: 0; }
+.kk-base h3 { font: var(--h3); margin: 0; }
+.kk-base p  { font: var(--body); margin: 0; }
+.kk-base small { font: var(--body-sm); color: var(--muted); }
+.kk-base .overline { font: var(--overline); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--muted); }
+.kk-base .tnum { font-variant-numeric: tabular-nums; font-family: var(--font-num); }
+.kk-base code, .kk-base .mono { font-family: var(--font-mono); }

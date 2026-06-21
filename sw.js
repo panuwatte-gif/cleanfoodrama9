@@ -1,83 +1,74 @@
-const CACHE_VERSION = 'rama9-pwa-v15';
-const APP_SHELL = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './css/app.css?v=19',
-  './css/tokens.css',
-  './js/app.js?v=19',
-  './js/api.js',
-  './js/auth.js',
-  './js/components.js',
-  './js/icons.js',
-  './js/menu.js',
-  './js/foodgrid.js',
-  './js/crud.js',
-  './js/state.js',
-  './image-slot.js',
-  './js/storage.js',
-  './js/pages/attendance.js',
-  './js/pages/capture.js',
-  './js/pages/control.js',
-  './js/pages/dashboard.js',
-  './js/pages/expenses.js',
-  './js/pages/reports.js',
-  './js/pages/handbook.js',
-  './js/pages/music.js',
-  './js/pages/mytasks.js',
-  './js/pages/receiving.js',
-  './js/pages/recipe.js',
-  './js/pages/revenue.js',
-  './js/pages/simulator.js',
-  './js/pages/stock.js',
-  './js/pages/users.js',
-  './assets/logo-kaphrao-clean.png',
-  './assets/icon-192.png',
-  './assets/icon-512.png',
-  './assets/icon-maskable-192.png',
-  './assets/icon-maskable-512.png'
+// ============================================================
+// sw.js — service worker เล็กๆ สำหรับ PWA
+//   กลยุทธ์:
+//   • ไอคอน/รูป (static immutable) → cache-first (เร็ว ไม่เปลี่ยน)
+//   • html/css/js ของแอป (same-origin) → network-first + fallback cache
+//       → ออนไลน์ได้โค้ดล่าสุดเสมอ (เจ้าของแก้กับ AI แล้วเห็นผลทันทีหลังรีเฟรช)
+//       → ออฟไลน์ค่อยใช้สำเนาที่แคชไว้ (app shell เปิดได้)
+//   • cross-origin (Supabase/esm.sh/LIFF) → ปล่อยผ่าน network ตรงๆ ไม่ยุ่ง
+//   bump CACHE เมื่อเปลี่ยนกลยุทธ์/ล้างของเก่า
+// ============================================================
+
+const CACHE = "cfr9-shell-v2";
+const CORE = [
+  "./",
+  "./index.html",
+  "./_ds/colors_and_type.css",
+  "./css/cookbook.css",
+  "./css/proto.css",
+  "./manifest.webmanifest",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/apple-touch-icon-180.png",
 ];
 
-self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(APP_SHELL)).catch(() => undefined)
+self.addEventListener("install", (e) => {
+  e.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(CORE).catch(() => {})).then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_VERSION).map(key => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', event => {
-  const request = event.request;
-  const url = new URL(request.url);
+const isStaticAsset = (url) => /\.(png|jpg|jpeg|webp|svg|ico|woff2?|ttf)$/i.test(url.pathname);
 
-  if (request.method !== 'GET') return;
-  if (url.origin !== self.location.origin) return;
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // ข้ามข้ามโดเมน
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then(cache => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
+  // static immutable → cache-first
+  if (isStaticAsset(url)) {
+    e.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        if (res && res.status === 200) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+        return res;
+      }).catch(() => cached))
     );
     return;
   }
 
-  event.respondWith(
-    fetch(request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE_VERSION).then(cache => cache.put(request, copy));
-      return response;
-    }).catch(() => caches.match(request))
+  // app shell (html/css/js/json) → network-first + cache fallback
+  e.respondWith(
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200 && res.type === "basic") {
+          const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((cached) => {
+        if (cached) return cached;
+        if (req.mode === "navigate") return caches.match("./index.html");
+        return new Response("", { status: 504, statusText: "offline" });
+      }))
   );
 });
