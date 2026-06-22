@@ -262,15 +262,17 @@ function ownerSalesBlock(go, shopCtx) {
         ? branchCombo({ days, branches, h: 168, fmt })
         : h("div", { style: { padding: "26px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
             "ยังไม่มีข้อมูลยอดขาย", h("br"), "เริ่มที่ ", h("b", null, "บันทึกรายได้"), " แล้วกราฟจะขึ้นจริง"),
-      h("div", { class: "sales-branches" },
-        todayChips.map((b) => h("div", { class: "sb-chip" },
-          h("span", { class: "sb-top" },
-            h("span", { class: "sb-dot", style: { background: b.color } }),
-            h("span", { class: "sb-name" }, b.name),
-          ),
-          h("span", { class: "sb-val tnum" }, "฿" + fmt(b.today)),
-        )),
-      ),
+      names.length > 1
+        ? h("div", { class: "sales-branches" },
+            todayChips.map((b) => h("div", { class: "sb-chip" },
+              h("span", { class: "sb-top" },
+                h("span", { class: "sb-dot", style: { background: b.color } }),
+                h("span", { class: "sb-name" }, b.name),
+              ),
+              h("span", { class: "sb-val tnum" }, "฿" + fmt(b.today)),
+            )),
+          )
+        : h("span", { style: { display: "none" } }),
       h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
         pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
     );
