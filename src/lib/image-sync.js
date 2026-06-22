@@ -49,9 +49,6 @@ export async function initImageSync() {
   } catch (_) { /* โหลดไม่ได้ก็ข้าม */ }
 
   // ── ขาขึ้น: เฝ้าการเปลี่ยนแปลง → อัปรูปใหม่ขึ้นคลาวด์ ──
-  window.kkSlots.subscribe(scheduleMirror);
-  scheduleMirror();
-
   async function mirror() {
     const all = window.kkSlots.all();
     for (const id of Object.keys(all)) {
@@ -76,4 +73,8 @@ export async function initImageSync() {
     if (timer) return;
     timer = setTimeout(() => { timer = null; mirror(); }, 800);
   }
+
+  // เริ่มเฝ้าหลังประกาศตัวแปร/ฟังก์ชันครบแล้ว (กัน ReferenceError ตอนบูต)
+  window.kkSlots.subscribe(scheduleMirror);
+  scheduleMirror();
 }
