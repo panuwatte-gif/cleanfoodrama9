@@ -15,14 +15,14 @@ import { mascot } from "../components/mascot.js";
 import { itemIc } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { branchCombo } from "../components/charts.js";
-import { itemById, unitOf, fmt } from "../utils/formulas.js";
+import { itemById, unitOf, fmt, stockOf } from "../utils/formulas.js";
 import { isPlaceholderName } from "../services/authService.js";
 import {
   actionCount, homeCardSummary, inboxFor, pendingReviewFor, overdueAssignedBy,
   nameOf, isNotice, isOverdue, isDueToday,
 } from "../utils/messages.js";
 import { STOCK_SEED, MONEY, TODAY, branchDailySales } from "../data/seed.js";
-import { incomeRows, expenseRows } from "../data/store.js";
+import { incomeRows, expenseRows, items as allItems } from "../data/store.js";
 
 const DOW_FULL = { "จ.": "จันทร์", "อ.": "อังคาร", "พ.": "พุธ", "พฤ.": "พฤหัสบดี", "ศ.": "ศุกร์", "ส.": "เสาร์", "อา.": "อาทิตย์" };
 const MON_FULL = { "ม.ค.": "มกราคม", "ก.พ.": "กุมภาพันธ์", "มี.ค.": "มีนาคม", "เม.ย.": "เมษายน", "พ.ค.": "พฤษภาคม", "มิ.ย.": "มิถุนายน", "ก.ค.": "กรกฎาคม", "ส.ค.": "สิงหาคม", "ก.ย.": "กันยายน", "ต.ค.": "ตุลาคม", "พ.ย.": "พฤศจิกายน", "ธ.ค.": "ธันวาคม" };
@@ -47,7 +47,12 @@ function imageSlot(id, cls, placeholder) {
 
 export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
   const store = shopCtx ? shopCtx.shop : "พระราม 9";
-  const lowItems = STOCK_SEED.filter((s) => s.st !== "ok");
+  // ของใกล้หมด "จริง" จากสต๊อก (ใช้ได้ < 1.5 วัน) — เรียงน้อยสุดก่อน
+  const lowItems = (allItems() || [])
+    .map((it) => ({ it, info: stockOf(it.id) }))
+    .filter((x) => x.it && x.info && x.info.use > 0 && (x.info.qty / x.info.use) < 1.5)
+    .sort((a, b) => (a.info.qty / a.info.use) - (b.info.qty / b.info.use))
+    .slice(0, 8);
   const greetName = user && user.name && !isPlaceholderName(user.name) ? user.name : null;
   const greetText = greetName ? "สวัสดี " + greetName + "! พร้อมลุยงานวันนี้" : "ยินดีต้อนรับ · login นี้ยังไม่ได้ตั้งชื่อผู้ใช้";
   const me = user || { level: "staff" };
@@ -161,16 +166,15 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
           h("button", { type: "button", class: "lowstock-btn list-press", onClick: () => go({ name: "stocklist", low: true }) }, "ดูทั้งหมด", pi("chev", 13)),
         ),
         h("div", { class: "low-grid" },
-          lowItems.map((s) => {
-            const it = itemById(s.id);
-            const st = lowStat(s);
+          lowItems.map(({ it, info }) => {
+            const st = lowStat(info);   // info มี qty + use ครบ
             const color = st.c === "s-ok" ? "var(--primary-dark)" : st.c === "s-mid" ? "var(--warning-ink)" : "var(--danger)";
-            return h("div", { class: "low-cell", onClick: () => go({ name: "stockdetail", id: s.id }) },
+            return h("div", { class: "low-cell", onClick: () => go({ name: "stockdetail", id: it.id }) },
               h("span", { class: "low-stat " + st.c }, st.t),
-              imageSlot("low-" + s.id, "low-thumb", "วางรูป"),
+              imageSlot("icon-" + it.id, "low-thumb", "วางรูป"),   // คีย์เดียวกับข้อมูลกลาง/เมนู → รูป link กัน
               h("span", { class: "low-ic" }, itemIc(it)),
               h("div", { style: { fontSize: "11.5px", fontWeight: 700, lineHeight: 1.25, marginTop: "6px" } }, it.name),
-              h("div", { class: "tnum", style: { fontSize: "10.5px", color, fontWeight: 800 } }, "เหลือ " + s.qty + " " + unitOf(it)),
+              h("div", { class: "tnum", style: { fontSize: "10.5px", color, fontWeight: 800 } }, "เหลือ " + info.qty + " " + unitOf(it)),
             );
           }),
         ),

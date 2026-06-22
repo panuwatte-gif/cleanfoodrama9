@@ -143,19 +143,40 @@
   // raw upload. Longest side is capped at 2× the slot's rendered width
   // (retina) and at MAX_DIM. WebP keeps alpha and is ~10× smaller than PNG
   // for photos, so there's no need for per-image format picking.
+  // ถอดรหัสรูป: ลอง createImageBitmap ก่อน (เร็ว) ถ้าไม่ได้ใช้ <img> สำรอง
+  // (บางเบราว์เซอร์/บางไฟล์ createImageBitmap ล้ม → เคยขึ้น "Could not read")
+  async function decodeImage(file) {
+    if (typeof createImageBitmap === 'function') {
+      try { return await createImageBitmap(file); } catch (_) { /* ใช้ทางสำรองด้านล่าง */ }
+    }
+    return await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { img._objUrl = url; resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+      img.src = url;
+    });
+  }
+
   async function toDataUrl(file, targetW) {
-    const bitmap = await createImageBitmap(file);
+    const src = await decodeImage(file);
     try {
+      const sw = src.width || src.naturalWidth || 1;
+      const sh = src.height || src.naturalHeight || 1;
       const cap = Math.min(MAX_DIM, Math.max(1, Math.round(targetW * 2)) || MAX_DIM);
-      const scale = Math.min(1, cap / Math.max(bitmap.width, bitmap.height));
-      const w = Math.max(1, Math.round(bitmap.width * scale));
-      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const scale = Math.min(1, cap / Math.max(sw, sh));
+      const w = Math.max(1, Math.round(sw * scale));
+      const h = Math.max(1, Math.round(sh * scale));
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
-      return canvas.toDataURL('image/webp', 0.85);
+      canvas.getContext('2d').drawImage(src, 0, 0, w, h);
+      let out = canvas.toDataURL('image/webp', 0.85);
+      // เบราว์เซอร์ที่ไม่รองรับ webp toDataURL → ใช้ jpeg แทน
+      if (!out || out.slice(0, 15) !== 'data:image/webp') out = canvas.toDataURL('image/jpeg', 0.85);
+      return out;
     } finally {
-      bitmap.close && bitmap.close();
+      if (src.close) src.close();
+      if (src._objUrl) URL.revokeObjectURL(src._objUrl);
     }
   }
 
