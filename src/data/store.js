@@ -213,6 +213,21 @@ export async function removeItem(id) {
   if (it) { it.isActive = false; persist(); bumpData(); }
   return true;
 }
+
+// ---- เมนู (เพิ่ม/แก้/ลบ) — sync ขึ้น rama9_menus (ลบจริงได้เพราะ backend mirror delete) ----
+export async function saveMenu(menu) {
+  const list = menus();
+  const i = list.findIndex((x) => x.id === menu.id);
+  if (i >= 0) list[i] = { ...list[i], ...menu };
+  else list.push({ ...menu });
+  persist(); bumpData();
+  return clone(menu);
+}
+export async function removeMenu(id) {
+  initData().menus = menus().filter((m) => m.id !== id);
+  persist(); bumpData();
+  return true;
+}
 export async function saveAssumption(id, value) {
   const a = assumptions().find((x) => x.id === id);
   if (a) { a.v = value; persist(); bumpData(); }
