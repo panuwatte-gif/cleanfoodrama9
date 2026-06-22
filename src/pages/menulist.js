@@ -1,7 +1,9 @@
 // ============================================================
 // pages/menulist.js — เมนู · ราคาขาย
-//   เจ้าของ: แตะเมนูเพื่อแก้ (ชื่อ/ราคา/ส่วนลด/รูป) · ปุ่มล่างเพิ่มเมนูใหม่
-//   ราคาขาย − ส่วนลด = ราคาสุทธิ · รูปเก็บ Supabase + โชว์ทุกหน้าที่ใช้ร่วมกัน
+//   เจ้าของ: เพิ่ม/แก้/ลบ เมนูได้ (ชื่อ/กลุ่ม/หน่วย/ต้นทุน/ราคา/ส่วนลด/รูป)
+//   *** เพิ่มเมนู = สร้าง "รายการ" ในข้อมูลกลาง + "เมนู" (ราคา) ผูกกัน ***
+//   → จานเดียวโผล่ทุกหน้า (เมนู · ข้อมูลกลาง · นับสต๊อก) + รูปลิงก์กันด้วย id
+//   บังคับแค่ ชื่อ + ราคา (ที่เหลือใส่ทีหลังได้ — ต้นทุนไม่ต้องครบ)
 // ctx = { go, back, role, toast }
 // ============================================================
 
@@ -9,15 +11,34 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, searchBox, itemIc, iconPicker, emptyState } from "../components/components.js";
 import { sheet, pinSheetBody } from "../components/sheet.js";
-import { menus, saveMenu, removeMenu } from "../data/store.js";
-import { fmt } from "../utils/formulas.js";
+import { menus, saveMenu, removeMenu, saveItem } from "../data/store.js";
+import { fmt, itemById } from "../utils/formulas.js";
 
 const bold = (t) => h("b", null, t);
 const mst = { q: "", ctx: null, edit: null, pin: null };
 const field = (label, input) =>
   h("label", { class: "stack", style: { gap: "5px" } }, h("span", { class: "field-label" }, label), input);
 
-// รูปเมนู: รูปอัปเอง (icon-<item|id>) ก่อน → ไอคอนของ item ที่ผูก → ไอคอนสำรอง
+// กลุ่มเมนู → ผูกกับหมวด/หมวดย่อยจริงในข้อมูลกลาง (+ หน่วยเริ่มต้น)
+const MENU_GROUPS = [
+  { key: "beef",    cat: "protein", sub: "beef",    unit: "kg",  name: "เนื้อ" },
+  { key: "pork",    cat: "protein", sub: "pork",    unit: "kg",  name: "หมู" },
+  { key: "chicken", cat: "protein", sub: "chicken", unit: "kg",  name: "ไก่" },
+  { key: "duck",    cat: "protein", sub: "duck",    unit: "kg",  name: "เป็ด" },
+  { key: "fish",    cat: "protein", sub: "fish",    unit: "kg",  name: "ปลา" },
+  { key: "shrimp",  cat: "protein", sub: "shrimp",  unit: "kg",  name: "กุ้ง" },
+  { key: "egg",     cat: "egg",     sub: null,      unit: "ฟอง", name: "ไข่ / ของเพิ่ม" },
+  { key: "drink",   cat: "drink",   sub: "zero",    unit: "ขวด", name: "เครื่องดื่ม" },
+  { key: "other",   cat: "dry",     sub: null,      unit: "",    name: "อื่นๆ" },
+];
+const groupOf = (it) => {
+  if (!it) return "other";
+  const g = MENU_GROUPS.find((x) => x.cat === it.cat && (x.sub || null) === (it.sub || null))
+        || MENU_GROUPS.find((x) => x.cat === it.cat);
+  return g ? g.key : "other";
+};
+
+// รูปเมนู: รูปอัปเอง (icon-<item|id>) ก่อน → ไอคอน item ที่ผูก → ไอคอนสำรอง
 function menuIcon(m) {
   const key = "icon-" + (m.item || m.id);
   const photo = window.kkSlots ? window.kkSlots.get(key) : null;
@@ -61,7 +82,7 @@ export function menuListScreen(ctx) {
 }
 
 function paint(root) {
-  const { back, go, role } = mst.ctx;
+  const { back, role } = mst.ctx;
   const owner = role === "owner";
   const q = mst.q.toLowerCase();
   const list = menus().filter((m) => !q || (m.name || "").toLowerCase().includes(q));
@@ -71,7 +92,7 @@ function paint(root) {
     hdr({ title: "เมนู · ราคาขาย", sub: menus().length + " เมนู · ราคาขาย − ส่วนลด = ราคาสุทธิ", onBack: back, right: h("span", { class: "catic green" }, pi("tag", 18)) }),
     h("div", { class: "page stack" },
       owner
-        ? note(["แตะเมนูเพื่อ", bold("แก้ชื่อ/ราคา/ส่วนลด/รูป"), " · กด", bold("เพิ่มเมนูใหม่"), "ด้านล่าง — รูปจะโชว์ทุกหน้าที่ใช้เมนูนั้นร่วมกัน"], { iconName: "tag" })
+        ? note(["แตะเมนูเพื่อแก้ · กด", bold("เพิ่มเมนูใหม่"), "ด้านล่าง — เพิ่มแล้วจะไปโผล่ที่", bold("ข้อมูลกลาง"), "และนับสต๊อกได้ด้วย (เชื่อมกันด้วยรูป/ชื่อเดียวกัน)"], { iconName: "tag" })
         : note(["ราคาขาย − ส่วนลด = ", bold("ราคาสุทธิ"), " · แก้ไขทำที่ฝั่ง", bold("เจ้าของ")], { iconName: "tag" }),
       searchEl,
       list.length
@@ -87,8 +108,26 @@ function paint(root) {
 }
 
 /* ---------- เพิ่ม/แก้/ลบ ---------- */
-function openEdit(m, root) { mst.edit = { ...m }; renderSheets(root); }
-function openAdd(root) { mst.edit = { new: true, id: "mn-" + Date.now(), name: "", price: "", disc: "", icon: "tag" }; renderSheets(root); }
+function openAdd(root) {
+  const itemId = "new-" + Date.now();
+  mst.edit = { new: true, id: "mn-" + Date.now(), itemId, name: "", group: "other", unit: "", cost: "", price: "", disc: "", icon: "tag" };
+  renderSheets(root);
+}
+function openEdit(m, root) {
+  const it = m.item ? itemById(m.item) : null;
+  const itemId = m.item || m.id;   // เมนูเก่าที่ยังไม่มี item → ใช้ id เมนูเป็น id รายการ (เซฟแล้วจะสร้างให้)
+  mst.edit = {
+    id: m.id, itemId, item: m.item,
+    name: m.name || (it && it.name) || "",
+    group: groupOf(it),
+    unit: (it && it.unit) || "",
+    cost: it && it.cost != null ? String(it.cost) : "",
+    price: m.price != null ? String(m.price) : "",
+    disc: m.disc ? String(m.disc) : "",
+    icon: (it && it.icon) || m.icon || "tag",
+  };
+  renderSheets(root);
+}
 
 function askDelete(root) {
   const e = mst.edit;
@@ -103,28 +142,46 @@ function askDelete(root) {
 
 async function saveMenuEdit(root) {
   const e = mst.edit;
-  const rec = {
-    id: e.id, item: e.item,
-    name: (e.name || "").trim(),
-    price: Math.max(0, parseFloat(e.price) || 0),
-    disc: Math.max(0, parseFloat(e.disc) || 0),
-    icon: e.icon || "tag",
-  };
+  const g = MENU_GROUPS.find((x) => x.key === e.group) || MENU_GROUPS[MENU_GROUPS.length - 1];
+  const name = (e.name || "").trim();
+  const price = Math.max(0, parseFloat(e.price) || 0);
+  const disc = Math.max(0, parseFloat(e.disc) || 0);
+  const unit = (e.unit || g.unit || "").trim();
+  const hasCost = !(e.cost === "" || e.cost == null);
+
+  // 1) รายการในข้อมูลกลาง (เชื่อมทุกหน้า + นับสต๊อกได้) — ต้นทุนใส่เฉพาะถ้ามี
+  const itemRec = { id: e.itemId, cat: g.cat, sub: g.sub || undefined, name, unit, icon: e.icon || "tag", isActive: true };
+  if (hasCost) itemRec.cost = Math.max(0, parseFloat(e.cost) || 0);
+  await saveItem(itemRec);
+
+  // 2) เมนู (ราคา) ชี้มาที่รายการเดียวกัน
+  await saveMenu({ id: e.id, item: e.itemId, name, price, disc, icon: e.icon || "tag" });
+
   const isNew = e.new;
-  await saveMenu(rec);
   mst.edit = null;
   paint(root);
-  mst.ctx.toast(isNew ? "เพิ่มเมนูแล้ว" : "บันทึกแล้ว");
+  mst.ctx.toast(isNew ? "เพิ่มเมนูแล้ว — เชื่อมข้อมูลกลางให้ด้วย" : "บันทึกแล้ว");
 }
 
 function editBody(root) {
   const e = mst.edit;
-  const slotId = "icon-" + (e.item || e.id);
+  const slotId = "icon-" + e.itemId;
   const picker = iconPicker({ value: e.icon, tint: "green", slotId, onChange: (n) => { mst.edit.icon = n; } });
 
-  const nameIn = h("input", { type: "text", class: "input", value: e.name || "", placeholder: "เช่น ปลาทอดน้ำปลา + ข้าว" });
+  const nameIn = h("input", { type: "text", class: "input", value: e.name || "", placeholder: "เช่น หมูกระเทียม + ข้าว" });
+  const unitIn = h("input", { type: "text", class: "input", value: e.unit || "", placeholder: "kg / ฟอง / ขวด (ไม่ใส่ก็ได้)" });
+  const costIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.cost || "", placeholder: "ไม่ทราบ = เว้นว่าง" });
   const priceIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.price !== "" && e.price != null ? String(e.price) : "", placeholder: "0" });
   const discIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.disc ? String(e.disc) : "", placeholder: "0" });
+
+  const groupSel = h("select", { class: "input" },
+    MENU_GROUPS.map((gr) => h("option", { value: gr.key }, gr.name)));
+  groupSel.value = e.group || "other";
+  groupSel.addEventListener("change", () => {
+    mst.edit.group = groupSel.value;
+    const gr = MENU_GROUPS.find((x) => x.key === groupSel.value);
+    if (gr && !(unitIn.value && unitIn.value.trim())) { unitIn.value = gr.unit || ""; mst.edit.unit = unitIn.value; }
+  });
 
   const valid = () => !!(mst.edit.name && String(mst.edit.name).trim()) && parseFloat(priceIn.value) > 0;
   const saveBtn = h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => { if (valid()) saveMenuEdit(root); } }, pi("check", 16), "บันทึก");
@@ -132,18 +189,26 @@ function editBody(root) {
   nameIn.addEventListener("input", () => { mst.edit.name = nameIn.value; syncBtn(); });
   priceIn.addEventListener("input", () => { mst.edit.price = priceIn.value; syncBtn(); });
   discIn.addEventListener("input", () => { mst.edit.disc = discIn.value; });
+  costIn.addEventListener("input", () => { mst.edit.cost = costIn.value; });
+  unitIn.addEventListener("input", () => { mst.edit.unit = unitIn.value; });
   syncBtn();
 
   return h("div", { class: "stack", style: { gap: "12px" } },
-    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 8px" } }, e.new ? "เพิ่มเมนูใหม่" : "แก้ไขเมนู"),
-    field("ชื่อเมนู", nameIn),
+    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 4px" } }, e.new ? "เพิ่มเมนูใหม่" : "แก้ไขเมนู"),
+    h("div", { style: { fontSize: "11.5px", color: "var(--muted)", textAlign: "center", marginBottom: "4px" } }, "กรอกแค่ชื่อ + ราคา ก็บันทึกได้ · ที่เหลือใส่ทีหลังได้"),
+    field("ชื่อเมนู *", nameIn),
+    h("div", { class: "rowflex", style: { gap: "10px", alignItems: "flex-end" } },
+      h("div", { style: { flex: 1.3 } }, field("กลุ่ม (ไว้จัดหมวด/นับสต๊อก)", groupSel)),
+      h("div", { style: { flex: 1 } }, field("หน่วย", unitIn)),
+    ),
     h("div", null,
       h("div", { class: "field-label", style: { marginBottom: "6px" } }, "รูป/ไอคอนของเมนู"),
       picker,
     ),
     h("div", { class: "rowflex", style: { gap: "10px", alignItems: "flex-end" } },
-      h("div", { style: { flex: 1 } }, field("ราคาขาย (฿)", priceIn)),
-      h("div", { style: { flex: 1 } }, field("ส่วนลด (฿) — ไม่มีใส่ 0", discIn)),
+      h("div", { style: { flex: 1 } }, field("ราคาขาย (฿) *", priceIn)),
+      h("div", { style: { flex: 1 } }, field("ส่วนลด (฿)", discIn)),
+      h("div", { style: { flex: 1 } }, field("ต้นทุน (฿)", costIn)),
     ),
     saveBtn,
     !e.new && h("button", { type: "button", class: "btn btn-block", style: { color: "var(--danger)", borderColor: "var(--danger)" }, onClick: () => askDelete(root) }, pi("trash", 15), "ลบเมนูนี้"),

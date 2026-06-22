@@ -45,6 +45,18 @@ function imageSlot(id, cls, placeholder) {
   return el;
 }
 
+// ช่องรูป "ของใกล้หมด" หน้าแรก — แสดงผลอย่างเดียว (อัปรูปทำที่ข้อมูลกลาง/เมนู)
+// มีรูปที่อัปไว้ (icon-<id>) → โชว์เต็มช่อง · ไม่มี → โชว์ไอคอนรายการ
+function lowThumb(it) {
+  const photo = window.kkSlots ? window.kkSlots.get("icon-" + it.id) : null;
+  if (photo) {
+    return h("div", { class: "low-thumb", style: { overflow: "hidden" } },
+      h("img", { src: photo, alt: "", style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } }));
+  }
+  return h("div", { class: "low-thumb", style: { display: "flex", alignItems: "center", justifyContent: "center" } },
+    itemIc(it, { sm: false }));
+}
+
 export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
   const store = shopCtx ? shopCtx.shop : "พระราม 9";
   // ของใกล้หมด "จริง" จากสต๊อก (ใช้ได้ < 1.5 วัน) — เรียงน้อยสุดก่อน
@@ -171,8 +183,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
             const color = st.c === "s-ok" ? "var(--primary-dark)" : st.c === "s-mid" ? "var(--warning-ink)" : "var(--danger)";
             return h("div", { class: "low-cell", onClick: () => go({ name: "stockdetail", id: it.id }) },
               h("span", { class: "low-stat " + st.c }, st.t),
-              imageSlot("icon-" + it.id, "low-thumb", "วางรูป"),   // คีย์เดียวกับข้อมูลกลาง/เมนู → รูป link กัน
-              h("span", { class: "low-ic" }, itemIc(it)),
+              lowThumb(it),
               h("div", { style: { fontSize: "11.5px", fontWeight: 700, lineHeight: 1.25, marginTop: "6px" } }, it.name),
               h("div", { class: "tnum", style: { fontSize: "10.5px", color, fontWeight: 800 } }, "เหลือ " + info.qty + " " + unitOf(it)),
             );
