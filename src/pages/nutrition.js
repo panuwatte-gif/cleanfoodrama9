@@ -10,7 +10,7 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, seg, searchBox, itemIc, emo, emptyState, qtyInput } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
-import { itemById, sectionsFor } from "../utils/formulas.js";
+import { itemById, sectionsFor, sortMenus } from "../utils/formulas.js";
 import { cats, menus, nutriMenu, nutriIngr, saveNutri, removeNutri } from "../data/store.js";
 import { uid } from "../utils/id.js";
 
@@ -100,7 +100,7 @@ function paint(root) {
 
   let body;
   if (nst.mode === "menu") {
-    const list = menus().filter((m) => !q || m.name.toLowerCase().includes(q));
+    const list = sortMenus(menus()).filter((m) => !q || m.name.toLowerCase().includes(q));
     // รายการที่เพิ่มเอง (ไม่ผูกกับเมนูในระบบ)
     const menuIds = new Set(menus().map((m) => m.id));
     const customs = Object.keys(nutriMenu())

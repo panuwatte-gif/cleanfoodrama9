@@ -63,6 +63,25 @@ export const sectionsFor = (cs) => {
 export const orderCats = () => cats().filter((c) => ORDER_CAT_IDS.includes(c.id));
 export const orderItems = () => items().filter((it) => ORDER_CAT_IDS.includes(it.cat) && it.isActive !== false);
 
+// จัดลำดับเมนูให้เหมือนกันทุกหน้า (หน้าเมนู + โภชนาการ): ตามหมวด → หมวดย่อย → ชื่อ
+export function menuSortIndex(m) {
+  const it = itemById(m.item);
+  const cs = cats();
+  const ci = it ? cs.findIndex((c) => c.id === it.cat) : -1;
+  const cat = ci >= 0 ? cs[ci] : null;
+  const subs = (cat && cat.subs) || [];
+  const si = it && it.sub ? subs.findIndex((s) => s.id === it.sub) : -1;
+  return { ci: ci < 0 ? 999 : ci, si: si < 0 ? 998 : si };
+}
+export function sortMenus(list) {
+  return (list || []).slice().sort((a, b) => {
+    const ka = menuSortIndex(a), kb = menuSortIndex(b);
+    if (ka.ci !== kb.ci) return ka.ci - kb.ci;
+    if (ka.si !== kb.si) return ka.si - kb.si;
+    return (a.name || "").localeCompare(b.name || "", "th");
+  });
+}
+
 /* ====================================================================
    พยากรณ์ยอดขาย — hash → base → ช่วง
 ==================================================================== */

@@ -11,11 +11,11 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, searchBox, itemIc, iconPicker, emptyState } from "../components/components.js";
 import { sheet, pinSheetBody } from "../components/sheet.js";
-import { menus, saveMenu, removeMenu, saveItem } from "../data/store.js";
-import { fmt, itemById } from "../utils/formulas.js";
+import { menus, saveMenu, removeMenu, saveItem, items } from "../data/store.js";
+import { fmt, itemById, sortMenus } from "../utils/formulas.js";
 
 const bold = (t) => h("b", null, t);
-const mst = { q: "", ctx: null, edit: null, pin: null };
+const mst = { q: "", ctx: null, edit: null, pin: null, pick: false, pickQ: "" };
 const field = (label, input) =>
   h("label", { class: "stack", style: { gap: "5px" } }, h("span", { class: "field-label" }, label), input);
 
@@ -37,6 +37,20 @@ const groupOf = (it) => {
         || MENU_GROUPS.find((x) => x.cat === it.cat);
   return g ? g.key : "other";
 };
+const groupName = (it) => { const g = MENU_GROUPS.find((x) => x.key === groupOf(it)); return g ? g.name : "อื่นๆ"; };
+
+// ของกินที่ "ขายได้" และยังไม่ได้เป็นเมนู → เอามาเลือกตั้งเป็นเมนู (กันพิมพ์ซ้ำ)
+const FOOD_CATS = ["protein", "egg", "drink"];
+const GORDER = MENU_GROUPS.map((g) => g.key);
+function availableItems() {
+  const used = new Set(menus().map((m) => m.item).filter(Boolean));
+  return items()
+    .filter((it) => it.isActive !== false && FOOD_CATS.includes(it.cat) && !used.has(it.id))
+    .sort((a, b) => {
+      const ga = GORDER.indexOf(groupOf(a)), gb = GORDER.indexOf(groupOf(b));
+      return ga !== gb ? ga - gb : (a.name || "").localeCompare(b.name || "", "th");
+    });
+}
 
 // รูปเมนู: รูปอัปเอง (icon-<item|id>) ก่อน → ไอคอน item ที่ผูก → ไอคอนสำรอง
 function menuIcon(m) {
@@ -85,7 +99,7 @@ function paint(root) {
   const { back, role } = mst.ctx;
   const owner = role === "owner";
   const q = mst.q.toLowerCase();
-  const list = menus().filter((m) => !q || (m.name || "").toLowerCase().includes(q));
+  const list = sortMenus(menus()).filter((m) => !q || (m.name || "").toLowerCase().includes(q));
   const searchEl = searchBox({ value: mst.q, onChange: (v) => { mst.q = v; paint(root); }, placeholder: "ค้นหาเมนู…" });
 
   root.replaceChildren(
@@ -108,10 +122,51 @@ function paint(root) {
 }
 
 /* ---------- เพิ่ม/แก้/ลบ ---------- */
-function openAdd(root) {
+function openAdd(root) { mst.pick = true; mst.pickQ = ""; renderSheets(root); }
+function createNew(root) {
+  mst.pick = false;
   const itemId = "new-" + Date.now();
   mst.edit = { new: true, id: "mn-" + Date.now(), itemId, name: "", group: "other", unit: "", cost: "", price: "", disc: "", icon: "tag" };
   renderSheets(root);
+}
+function pickItem(it, root) {
+  mst.pick = false;
+  mst.edit = {
+    new: true, id: "mn-" + Date.now(), itemId: it.id, item: it.id,
+    name: it.name, group: groupOf(it), unit: it.unit || "",
+    cost: it.cost != null ? String(it.cost) : "", price: "", disc: "", icon: it.icon || "tag",
+  };
+  renderSheets(root);
+}
+function pickRow(it, root) {
+  return h("button", { type: "button", class: "card split", style: { padding: "9px 12px", width: "100%", cursor: "pointer", textAlign: "left" }, onClick: () => pickItem(it, root) },
+    h("div", { class: "rowflex", style: { minWidth: 0, flex: 1, gap: "9px" } },
+      itemIc(it, { sm: false }),
+      h("div", { style: { minWidth: 0 } },
+        h("div", { style: { fontWeight: 700, fontSize: "13.5px" } }, it.name),
+        h("div", { style: { fontSize: "11px", color: "var(--muted)" } }, groupName(it) + (it.cost != null ? " · ต้นทุน " + fmt(it.cost) + " ฿" : "")),
+      ),
+    ),
+    pi("chev", 14),
+  );
+}
+function pickBody(root) {
+  const q = (mst.pickQ || "").toLowerCase();
+  const all = availableItems();
+  const list = all.filter((it) => !q || (it.name || "").toLowerCase().includes(q));
+  const searchEl = searchBox({ value: mst.pickQ || "", onChange: (v) => { mst.pickQ = v; renderSheets(root); }, placeholder: "ค้นหาของกินในข้อมูลกลาง…" });
+  if (mst.pickQ) setTimeout(() => { const inp = searchEl.querySelector("input"); if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n, n); } }, 0);
+  return h("div", { class: "stack", style: { gap: "10px" } },
+    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 2px" } }, "เลือกเมนูจากข้อมูลกลาง"),
+    h("div", { style: { fontSize: "11.5px", color: "var(--muted)", textAlign: "center", marginBottom: "2px" } }, "แตะของที่จะตั้งขาย — ไม่ต้องพิมพ์เอง กันชื่อซ้ำ"),
+    searchEl,
+    all.length
+      ? (list.length
+          ? h("div", { class: "stack", style: { gap: "6px", maxHeight: "44vh", overflowY: "auto" } }, list.map((it) => pickRow(it, root)))
+          : h("div", { style: { textAlign: "center", color: "var(--muted)", fontSize: "12.5px", padding: "14px" } }, 'ไม่พบ "' + mst.pickQ + '"'))
+      : h("div", { style: { textAlign: "center", color: "var(--muted)", fontSize: "12.5px", padding: "14px" } }, "ของกินในข้อมูลกลางถูกตั้งเป็นเมนูครบแล้ว"),
+    h("button", { type: "button", class: "btn btn-block", onClick: () => createNew(root) }, pi("plus", 15), "สร้างของใหม่ (ไม่มีในข้อมูลกลาง)"),
+  );
 }
 function openEdit(m, root) {
   const it = m.item ? itemById(m.item) : null;
@@ -218,6 +273,7 @@ function editBody(root) {
 function renderSheets(root) {
   const layer = root._sheets;
   layer.replaceChildren();
+  if (mst.pick) layer.appendChild(sheet({ onClose: () => { mst.pick = false; mst.pickQ = ""; renderSheets(root); }, children: pickBody(root) }));
   if (mst.edit) layer.appendChild(sheet({ onClose: () => { mst.edit = null; renderSheets(root); }, children: editBody(root) }));
   if (mst.pin) layer.appendChild(sheet({
     onClose: () => { mst.pin = null; renderSheets(root); },
