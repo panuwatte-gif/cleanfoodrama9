@@ -9,7 +9,7 @@
 //   bump CACHE เมื่อเปลี่ยนกลยุทธ์/ล้างของเก่า
 // ============================================================
 
-const CACHE = "cfr9-shell-v2";
+const CACHE = "cfr9-shell-v3";
 const CORE = [
   "./",
   "./index.html",

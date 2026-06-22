@@ -9,8 +9,23 @@
 // วันที่อ้างอิง: พฤหัส 11 มิ.ย. 2569
 // ============================================================
 
-export const TODAY = { dow: 'พฤ.', d: 11, mon: 'มิ.ย.', full: 'พฤหัสบดี 11 มิ.ย. 2569' };
-export const TOMORROW = { dow: 'ศ.', d: 12, mon: 'มิ.ย.', label: 'ศุกร์ 12 มิ.ย.' };
+// วันที่ "จริง" จากเครื่องผู้ใช้ (พ.ศ. = ค.ศ.+543)
+const _DOW_ABBR = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const _DOW_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const _MON_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function _mkDay(dt) {
+  const be = dt.getFullYear() + 543;
+  return {
+    dow: _DOW_ABBR[dt.getDay()], d: dt.getDate(), mon: _MON_ABBR[dt.getMonth()], be,
+    full: _DOW_FULL[dt.getDay()] + ' ' + dt.getDate() + ' ' + _MON_ABBR[dt.getMonth()] + ' ' + be,
+  };
+}
+const _NOW = new Date();
+const _TMR = new Date(_NOW.getFullYear(), _NOW.getMonth(), _NOW.getDate() + 1);
+export const TODAY = _mkDay(_NOW);
+export const TOMORROW = Object.assign(_mkDay(_TMR), {
+  label: _DOW_FULL[_TMR.getDay()] + ' ' + _TMR.getDate() + ' ' + _MON_ABBR[_TMR.getMonth()],
+});
 
 /* ---------- หมวด + หมวดย่อย (master — ทุกหน้าเรียงตามนี้) ---------- */
 export const CATS_SEED = [

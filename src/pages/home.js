@@ -85,7 +85,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
         h("span", { class: "hero-spark1", style: { fontSize: "15px" }, "aria-hidden": "true" }, "✨"),
         h("span", { class: "hero-spark2", style: { fontSize: "11px" }, "aria-hidden": "true" }, "🌸"),
         h("div", { class: "greet" }, pi("heart", 16), greetText),
-        h("div", { class: "bigdate" }, "วัน" + (DOW_FULL[TODAY.dow] || "") + "ที่ ", h("b", null, String(TODAY.d)), " " + (MON_FULL[TODAY.mon] || TODAY.mon) + " 2569"),
+        h("div", { class: "bigdate" }, "วัน" + (DOW_FULL[TODAY.dow] || "") + "ที่ ", h("b", null, String(TODAY.d)), " " + (MON_FULL[TODAY.mon] || TODAY.mon) + " " + TODAY.be),
         h("div", { class: "meta" },
           (() => { const c = pi("cal", 14); c.classList.add("ic-cal"); return c; })(), store,
           h("span", { style: { color: "var(--faint)" } }, "·"), "เข้าสู่เวลาทำงานแล้ว",
@@ -199,16 +199,20 @@ function helperTile(go, tintCls, ic, name, sub, link, route) {
 
 // ---- บล็อกยอดขาย (เจ้าของ) = สถิติคู่ + กราฟเดียว 2 แกน (เลือกช่วงได้) ----
 function ownerSalesBlock(go, shopCtx) {
-  const names = shopCtx && shopCtx.shops ? shopCtx.shops.map((s) => s.name) : ["ร้านหลัก"];
-  const data = branchDailySales(names);
-  // คำนวณจากรายการจริงที่บันทึกไว้ (income/expense) — ถ้ายังไม่มีจึงใช้ค่าตั้งต้น
+  const names = shopCtx && shopCtx.shops ? shopCtx.shops.map((s) => s.name) : ["ร้าน"];
+  const mainName = names[0] || "ร้าน";
+  // อ่านจาก "รายการจริง" ที่บันทึกไว้เท่านั้น (income/expense → Supabase) · ยังไม่มี = 0
   const inc = incomeRows(), exp = expenseRows();
-  const hasReal = inc.length > 0 || exp.length > 0;
-  const realNet = inc.reduce((s, r) => s + (r.net || 0), 0) - exp.reduce((s, r) => s + (r.amount || 0), 0);
-  const net = hasReal ? realNet : (MONEY.monthIncome - MONEY.monthExpense);
+  const net = inc.reduce((s, r) => s + (r.net || 0), 0) - exp.reduce((s, r) => s + (r.amount || 0), 0);
   const netStr = (net >= 0 ? "+฿" : "−฿") + fmt(Math.abs(net));
-  const todayInc = inc.filter((r) => r.day === TODAY.d).reduce((s, r) => s + (r.gross || 0), 0);
-  const todayTotal = todayInc > 0 ? todayInc : data.todayTotal;
+  const todayTotal = inc.filter((r) => r.day === TODAY.d).reduce((s, r) => s + (r.gross || 0), 0);
+  // กราฟจากยอดจริงรายวัน (รวมทุกช่องทางต่อวัน) · ยังไม่มีข้อมูล = กราฟว่าง (ไม่โชว์เดโม)
+  const _byDay = {};
+  for (const r of inc) _byDay[r.day] = (_byDay[r.day] || 0) + (r.gross || 0);
+  const series = Object.keys(_byDay).map(Number).sort((a, b) => a - b)
+    .map((d) => ({ d, byBranch: { [mainName]: _byDay[d] }, total: _byDay[d] }));
+  const branches = [{ name: mainName, color: "#54AE7B" }];
+  const todayChips = [{ name: mainName, color: "#54AE7B", today: todayTotal }];
 
   const statCard = (cls, icCls, ic, label, num, sub, route) =>
     h("button", { type: "button", class: "stat-card " + cls + " list-press", onClick: () => go({ name: route }) },
@@ -227,7 +231,7 @@ function ownerSalesBlock(go, shopCtx) {
   const chartCard = h("div", { class: "card sales-card" });
   let range = "month";
   function paintChart() {
-    const days = range === "week" ? data.days.slice(-7) : data.days;
+    const days = range === "week" ? series.slice(-7) : series;
     const sel = h("select", { class: "sales-range" },
       h("option", { value: "month" }, "ตามวันที่บันทึกจริง"),
       h("option", { value: "week" }, "7 วันล่าสุด"),
@@ -239,9 +243,12 @@ function ownerSalesBlock(go, shopCtx) {
         h("span", { class: "sales-title" }, "ยอดขายรายวัน · ยอดขาย + สะสม"),
         sel,
       ),
-      branchCombo({ days, branches: data.branches, h: 168, fmt }),
+      days.length
+        ? branchCombo({ days, branches, h: 168, fmt })
+        : h("div", { style: { padding: "26px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
+            "ยังไม่มีข้อมูลยอดขาย", h("br"), "เริ่มที่ ", h("b", null, "บันทึกรายได้"), " แล้วกราฟจะขึ้นจริง"),
       h("div", { class: "sales-branches" },
-        data.today.map((b) => h("div", { class: "sb-chip" },
+        todayChips.map((b) => h("div", { class: "sb-chip" },
           h("span", { class: "sb-top" },
             h("span", { class: "sb-dot", style: { background: b.color } }),
             h("span", { class: "sb-name" }, b.name),
@@ -257,7 +264,7 @@ function ownerSalesBlock(go, shopCtx) {
 
   return [
     h("div", { class: "stat-pair" },
-      statCard("sc-sales", "", "trend", "ยอดขายทุกสาขาวันนี้", "฿" + fmt(todayTotal), data.branches.length + " สาขา · " + TODAY.d + " " + TODAY.mon, "execsummary"),
+      statCard("sc-sales", "", "trend", "ยอดขายวันนี้", "฿" + fmt(todayTotal), "วันนี้ · " + TODAY.d + " " + TODAY.mon, "execsummary"),
       statCard("sc-net", "net", "wallet", "ยอดสุทธิเดือนนี้", netStr, "รายได้ − ค่าใช้จ่าย = กำไร", "money"),
     ),
     chartCard,
