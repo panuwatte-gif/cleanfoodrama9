@@ -56,6 +56,7 @@ import { menuListScreen } from "./pages/menulist.js";
 import { messagesScreen } from "./pages/messages.js";
 import { exportScreen } from "./pages/export.js";
 import "./lib/image-slot.js"; // ลงทะเบียน <image-slot> + window.kkSlots
+import { initImageSync } from "./lib/image-sync.js"; // เชื่อมรูป ↔ Supabase Storage
 
 // ---- เปลือกสถานะแอป (single source สำหรับ navigation) ----
 const S = {
@@ -280,6 +281,7 @@ function boot() {
   // ดึงข้อมูลจริงจาก Supabase (ถ้า config ไว้) มาแทนที่แคช localStorage แล้ว
   // bumpData() ให้ทุกหน้าวาดใหม่ · ออฟไลน์ → คงใช้ข้อมูลในเครื่อง
   hydrateData();
+  try { initImageSync(); } catch (_) {}
   // อัปเดตแถบสถานะเมื่อ online/offline สลับ (ไม่ rerender ทั้งหน้า กัน focus หลุด)
   onBackendStatus(() => {
     const strip = document.querySelector(".demo-strip");

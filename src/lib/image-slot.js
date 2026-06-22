@@ -642,8 +642,13 @@
   window.kkSlots = {
     get(id) {
       const v = getSlot(id);
-      return v && v.u && /^data:image\//i.test(v.u) ? v.u : null;
+      if (!v || !v.u) return null;
+      // รับทั้ง data: URL (เพิ่งอัป) และ https: URL (โหลดจาก Supabase)
+      return /^(data:image\/|https?:\/\/)/i.test(v.u) ? v.u : null;
     },
+    getRaw(id) { return getSlot(id); },
+    set(id, val) { setSlot(id, val); },
+    all() { return Object.assign({}, slots); },
     subscribe(fn) { subs.add(fn); load(); return () => subs.delete(fn); },
   };
 
