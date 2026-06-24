@@ -8,11 +8,12 @@
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { seg, searchBox, note, menuTabs, hdr } from "../components/components.js";
-import { entryList, entryFoot, confirmSheet } from "./_entry.js";
+import { entryList, entryFoot, confirmSheet, isFilled, sumOf } from "./_entry.js";
 import { orderCats, orderItems, itemById, unitOf } from "../utils/formulas.js";
 import { TODAY } from "../data/seed.js";
 import { load, save } from "../utils/storage.js";
 import { sendOrderReport } from "../services/reportService.js";
+import { applyReceive } from "../data/store.js";
 
 const DKO = "draft:order", DKR = "draft:recv";
 
@@ -93,11 +94,20 @@ function renderSheets(root) {
     onClose: () => { st.confirm = false; renderSheets(root); },
     onSave: async () => {
       st.confirm = false; renderSheets(root);
-      if (!isOrder) { ctx.toast("บันทึกรับของแล้ว · เข้าสต๊อกทันที"); ctx.back(); return; }
+      if (!isOrder) {
+        // บันทึกรับของจริง → บวกเข้าสต๊อก (persist + sync Supabase)
+        const lines = oi.filter((it) => isFilled(st.valsR, it))
+          .map((it) => ({ id: it.id, qty: Number(sumOf(st.valsR, it)) }))
+          .filter((l) => l.qty > 0);
+        const n = await applyReceive(lines, ctx.user ? ctx.user.name : (ctx.role === "owner" ? "เจ้าของ" : "พนักงาน"));
+        st.valsR = {}; save(DKR, st.valsR);
+        ctx.toast(n ? "บันทึกรับของ " + n + " รายการ · เข้าสต๊อกแล้ว" : "ยังไม่ได้กรอกจำนวนที่รับ");
+        ctx.back(); return;
+      }
       // ส่งใบสั่งของจริงเข้ากลุ่ม LINE (POST ไป webhook ผ่าน reportService)
-      const lines = Object.entries(st.valsO)
-        .filter(([, v]) => v !== "" && v != null && Number(v) !== 0)
-        .map(([id, v]) => { const it = itemById(id); return { name: it ? it.name : id, qty: v, unit: it ? unitOf(it) : "" }; });
+      const lines = oi.filter((it) => isFilled(st.valsO, it))
+        .map((it) => ({ name: it.name, qty: Number(sumOf(st.valsO, it)), unit: unitOf(it) }))
+        .filter((l) => l.qty > 0);
       const res = await sendOrderReport({ lines, shop: ctx.shopCtx ? ctx.shopCtx.shop : "", date: TODAY.dow + " " + TODAY.d + " " + TODAY.mon });
       if (res.ok) { ctx.toast("ส่งใบสั่งของให้สาขาหลักใน LINE แล้ว"); ctx.back(); }
       else if (res.skipped) { ctx.toast("ส่งใบสั่งแล้ว (เดโม — ยังไม่ได้ตั้งค่า Webhook)"); ctx.back(); }

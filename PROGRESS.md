@@ -530,3 +530,122 @@
   · `unused_index` shop FK เก็บไว้ (ได้ใช้เมื่อมีหลายสาขา) · ERROR `rls_disabled_in_public` 3 ตัว = ตารางระบบอื่น (ไม่ใช่ rama9)
 - ข้อความ LINE ยังใช้ตัวเลขเดโม (mirror prototype) — ผูกข้อมูลจริงจาก store ตอนต่อ income/expense relational
 - `REPORT_WEBHOOK_URL` default ว่าง = โหมดเดโม (ส่งแล้วไม่ยิงจริง) · ใส่ URL ใน config → ยิงจริงทันที
+
+---
+
+## ✅ เฟส 7 — สต๊อกจริง (ledger) + แยกข้าวจากเมนู + ค่าแรง persist  (เสร็จแล้ว · รอบนี้)
+
+ผลลัพธ์: ปุ่ม "เด้ง toast แต่ไม่เซฟ" หลักของสต๊อกกลายเป็น **บันทึกจริง → sync Supabase** ·
+เมนูแยกข้าวออกจากชื่อ + ติ๊กเลือกข้าว · ค่าแรงพนักงานเก็บถาวร
+ตรวจแล้ว (import test + UI): receive/count/waste/adjust round-trip ครบ ไม่มี console error
+
+### 1) สต๊อกจริง (rama9_stock_items) — เลิกอ่าน STOCK_SEED คงที่
+- `utils/formulas.js` — `stockOf(id)` อ่าน **แถวสต๊อกสด** จาก `stockRows()` ก่อน (ไม่มี → derive เหมือนเดิม) ·
+  เพิ่ม `deriveStock(id)` (hash-based, รายการที่ยังไม่มีแถว) · `stStatus(qty,use,threshold)` · `threshOf(id)` ·
+  `STOCK_DAYS()` อ่านสต๊อกสดแล้ว · status (ต่ำ/ใกล้หมด/พอ) คิดสดจาก qty÷use เทียบ `low-days` หรือ threshold รายตัว
+- `data/store.js` — เครื่องมือสต๊อกจริง (persist + bumpData + scheduleSync + logEdit):
+  - `applyReceive(lines,by)` — บวกเข้าคงเหลือ + เพิ่มล็อตวันนี้ (age 0)
+  - `applyCount(lines,by)`   — ตั้งคงเหลือ = ยอดที่นับ (set) + ปรับล็อตตามสัดส่วน
+  - `applyWaste(lines,by)`   — ตัดออกแบบ FIFO (เก่าก่อน)
+  - `editStockQty(id,qty,by)` · `setStockThreshold(id,v)` · `ensureStockRow` (สร้างแถวจาก derive ถ้ายังไม่มี)
+- หน้าจอเรียกของจริงแล้ว:
+  - `pages/orderrecv.js` รับของ → `applyReceive` (เคลียร์ draft) · แก้บั๊กเดิม: ข้อความใบสั่ง LINE เคยอ่าน key `id:m` ผิด → ใช้ `sumOf` แล้ว
+  - `pages/count.js` ยืนยันนับ → `applyCount` แล้วไปหน้าทิ้ง
+  - `pages/waste.js` บันทึกของทิ้ง → `applyWaste` (FIFO)
+  - `pages/stocklist.js` แก้คงเหลือ → `editStockQty` · ตั้งเกณฑ์รายตัว → `setStockThreshold` (รายการดึงจาก stock สด + `threshOf`)
+
+### 2) แยกข้าวออกจากชื่อเมนู + ติ๊กเลือกข้าว
+- `data/seed.js` — `MENUS_SEED` ลบ "+ ข้าว" จากชื่อ + เพิ่ม `rice:bool` · `riceItem` (ชนิดข้าว)
+- `data/store.js` — `migMenu()` (idempotent) แยก "+ ข้าว" ออกจากชื่อที่เก็บไว้เดิม + ตั้ง rice/riceItem ·
+  รันใน `initData` และ `__adoptRemote('menus')` (กันข้อมูลคลาวด์ที่ชื่อยังมี "+ ข้าว")
+- `pages/menulist.js` — แถวเมนูโชว์ป้าย "+ ข้าว · <ชนิดข้าว>" แยกจากชื่อ · ชีตแก้เมนูมี toggle "เสิร์ฟพร้อมข้าว" + เลือกชนิดข้าว ·
+  เลือกของโปรตีนตั้งค่าเริ่ม rice=true ให้
+- คลาวด์ `rama9_menus` อัปเดตชื่อ+rice ที่ source แล้ว (SQL)
+
+### 3) ค่าแรงพนักงานเก็บถาวร (rama9_payroll — ตารางใหม่)
+- สร้างตาราง `rama9_payroll` (id/data jsonb) + RLS `rama9_all_write` (anon/auth) เหมือนตารางอื่น
+- `config.js` เพิ่ม key `payroll` · `store.js` collection `payroll` (`getPayroll/setPayroll` · seed PAYROLL) ·
+  `backend.js` sync ขึ้นคลาวด์ · `pages/payroll.js` โหลดจาก store + กดบันทึก → `setPayroll` (เคยแค่ toast)
+
+### หมายเหตุ / เหลือทำ (รอบหน้า)
+- ของทิ้งในหน้า waste ยังโชว์ "หายไป" เป็นเดโม (แต่การหักสต๊อกจริงแล้ว) · แก้/เพิ่มล็อตทีละล็อตยังไม่มี UI (รับของ=เพิ่มล็อต)
+- หน้า reports/forecast/recipes ส่วนวิเคราะห์ยังเดโม (ต้องมีประวัติยอดขายจริงก่อน) · ประวัติแก้ไข (edit history) ยังไม่ persist รายการ
+- ถ่ายรูปบิล/สลิป: `<image-slot>` ย่อรูปอัตโนมัติอยู่แล้ว (1200px WebP q0.85) — เหลือผูกหน้า expense/order เข้าถ่าย+อัปจริง
+- 🔒 ปิด RLS รอบสุดท้าย (เจ้าของกั๊กไว้ทำหลังเทสต์ครบ) — ตารางใหม่ `rama9_payroll` ใช้ policy หลวมเดียวกัน รอปิดพร้อมกัน
+
+---
+
+## ✅ เฟส 8 — แก้บั๊ก persist รายรับ-จ่าย + audit ขึ้นคลาวด์ + รูปใบเสร็จ + ล็อตจริง  (เสร็จแล้ว · รอบนี้)
+
+ผลลัพธ์: ปิดช่องโหว่ "กดบันทึกแล้วขึ้นว่าเซฟคลาวด์ แต่จริงๆ ไม่ขึ้น" ของรายรับ/รายจ่าย ·
+ประวัติการแก้ (audit) ขึ้นคลาวด์แล้ว · แนบรูปใบเสร็จ/สลิปในหน้าค่าใช้จ่าย (บีบอัตโนมัติ) ·
+แก้/เพิ่ม/ลบล็อต FIFO ได้จริง (เคยเป็น toast เดโม) · ตรวจ round-trip กับ Supabase จริงผ่านทุกจุด
+
+### 1) 🐞 บั๊กใหญ่: รายรับ/รายจ่าย ไม่ขึ้นคลาวด์จริง (แก้แล้ว)
+- ตาราง `rama9_income` / `rama9_expenses` ถูกสร้างแบบ **relational** (ไม่มีคอลัมน์ `data jsonb`)
+  แต่ `data/backend.js` sync ทุก collection เป็นรูป `{ id, data }` เหมือนตารางอื่น →
+  upsert **ล้มเงียบ** (apiClient fallback เป็น localStorage) ทุกครั้ง · เปิดเครื่องอื่นไม่เห็นข้อมูล
+- แก้ที่ DB (migration `rama9_income_expense_jsonb`): เพิ่ม `data jsonb` + `updated_at` ·
+  คอลัมน์ relational เดิม (shop/channel/gross_amount/.../category/amount/note/receipt_url)
+  เปลี่ยนเป็น **generated column** ดึงค่าจาก `data->>...` (ยังทำรายงาน SQL ได้ · แอป sync ผ่าน jsonb ตามปกติ)
+- ทดสอบ: upsert + select + remove ครบทั้ง income/expenses → ขึ้น Supabase จริง (online:true, backend:supabase) ✓
+- โค้ดหน้า income.js/expense.js **ไม่ต้องแก้** (เรียก saveIncomeRecord/saveExpenseRecord อยู่แล้ว)
+
+### 2) ประวัติแก้ไข (audit / edit log) ขึ้นคลาวด์
+- เดิม `data/editlog.js` เก็บ localStorage อย่างเดียว · `editLogs` ไม่อยู่ใน COLLECTIONS ของ backend → ไม่ sync
+- เพิ่ม `editLogs` เข้า COLLECTIONS (sync ขึ้น `rama9_edit_logs`) · `adoptEditLogs()` (merge cloud+local
+  dedupe ตาม id เรียงใหม่สุดบน) · `logEdit()` ยิง `scheduleSync()` ผ่าน late-import (กัน import วน)
+- ทดสอบ upsert/select/remove บน `rama9_edit_logs` → ผ่าน ✓
+
+### 3) รูปใบเสร็จ / สลิป ในหน้าค่าใช้จ่าย (งาน B)
+- `pages/expense.js` เพิ่ม `<image-slot>` ("ถ่าย/แนบรูปใบเสร็จ-สลิป") ทั้งโหมดรายการ + โหมดยอดรวม ·
+  slot id = `rcpt-<วัน>-<หมวด>` (คงที่ · โหลดกลับได้) · ระบบบีบรูปอัตโนมัติ (1200px WebP q0.85) ·
+  `lib/image-sync.js` อัปขึ้น Supabase Storage + โหลดกลับทุกเครื่อง · เก็บ `receipt_slot`/`receipt_url` ในเรคคอร์ด
+
+### 4) ล็อต FIFO จริง (`pages/stockdetail.js` เขียนใหม่)
+- เลิกอ่าน `STOCK_SEED` คงที่ → อ่านสต๊อกสดผ่าน `stockOf(id)` · ปุ่ม "เพิ่มล็อต"/"แก้ล็อต" เปิดชีตจริง
+- `data/store.js` เพิ่ม `addLot / editLot / removeLot` — คงเหลือรวมคิดใหม่จากผลรวมล็อตเสมอ + เก็บ audit
+  (ตั้งล็อต = 0 → ลบล็อต) · ทดสอบ add/edit/remove ปรับ qty ถูกต้อง ✓
+
+### หมายเหตุ / เหลือทำ
+- 🔒 **RLS ยังเปิดเขียนหลวม (anon) ตามเดิม — ตั้งใจ** · มี edge function `rama9-auth` (loginWithPin) เตรียมไว้
+  แต่ flow login ฝั่ง client ยังคัดสิทธิ์เอง → ปิด RLS เป็น authenticated ตอนนี้จะทำให้แอปเขียนข้อมูลไม่ได้
+  ทั้งหมด · คงไว้ปิดรอบสุดท้ายพร้อมผูก Supabase Auth จริง (ตามที่เจ้าของกั๊กไว้)
+- หน้า reports / forecast / recipes / music ส่วน **วิเคราะห์ยังเป็นเดโม** — ต้องสะสมประวัติยอดขาย/รายรับ-จ่าย
+  จริงก่อน (ชั้นบันทึก+persist พร้อมแล้วรอบนี้) · music เป็นฟีเจอร์เสริม (เดโมตามดีไซน์)
+
+---
+
+## ✅ เฟส 9 — เดินสายรายงานให้อ่านข้อมูลจริง + กราฟหน้าแรกใหม่ + เพลงใช้งานจริง + แก้ UI หัวหน้า (เสร็จแล้ว · รอบนี้)
+
+### 1) UI ตามที่สั่ง
+- **แถบข้อความวิ่ง** หน้าแรก (พนักงาน/หัวหน้า) → เปลี่ยนทิศเป็น **ขวา→ซ้าย** (`@keyframes tickerLTR`)
+- **แถบบนสุดหน้าแรก** → ข้อความ **"CleanFoodRama9"** · ดึง dropdown ร้าน + จดหมาย + กระดิ่ง มาอยู่
+  **แถวเดียวกันบนสุด** ย่อขนาดไม่ให้ล้นขอบ (`.home-top` เป็น nowrap · chip/bell เล็กลง)
+- **กราฟหน้าแรกเจ้าของ** → แยกเป็น **3 กราฟในการ์ดเดียว สเกลแยกกัน**: โดนัท %รายได้ตามช่องทาง +
+  แท่งยอดขายรวมรายวัน + เส้นรายได้สะสม — คุมอยู่ในกรอบ ขนาดเหมาะสม (`charts.js` เพิ่ม `pieChart`/`barChart`)
+
+### 2) เดินสายรายงานให้อ่าน "ข้อมูลจริง" (income/expense/stock)
+- `pages/home.js` ownerSalesBlock → อ่าน income/expense จริง 100% (โดนัทช่องทาง · แท่งรายวัน · เส้นสะสม)
+- `pages/reports.js` — `realDaily()/realCum()/realStockValue()` จาก `incomeRows/expenseRows/stockOf`:
+  - การ์ด "รายรับ-รายจ่าย" + `incExpReportScreen` (กราฟผสม + คุ้มทุน) = **ยอดจริง** (ว่าง→empty state)
+  - `stockReport` มูลค่าสต๊อก = **คงเหลือจริง × ต้นทุน** · day-bars อ่าน `stockOf` (สดอยู่แล้ว)
+- `pages/execsummary.js` อ่าน income/expense จริงอยู่แล้ว (ยืนยัน)
+- ⚠️ **ยังเดโม** (ติดข้อมูลต้นทาง): top/low sellers + forecast ต่อเมนู + ตารางผลนับ stockReport —
+  ทั้งหมดต้องมี **การบันทึกยอดขายต่อเมนู (POS-style)** ซึ่งแอปยังไม่เก็บ (income เก็บรวมต่อช่องทาง ไม่ใช่ต่อเมนู)
+  → งานถัดไป: เพิ่มหน้าบันทึกยอดขายต่อเมนู แล้ว top/low/forecast จะจริงทันที
+
+### 3) เพลงร้าน — ใช้งานจริง (`pages/music.js` เขียนใหม่ + `lib/audio.js` ใหม่)
+- **อัปโหลดไฟล์เสียง** (mp3/wav/m4a/ogg) → **Supabase Storage** (bucket `item-images` prefix `audio/`) →
+  public URL · เล่นได้ทุกเครื่อง (ทดสอบ upload→decode→เล่นจริงผ่าน)
+- **เล่น/หยุด/เลื่อนเวลา** ด้วย `<audio>` จริง (progress bar คลิกเลื่อนได้ · เวลาเดินจริง)
+- **ตัดเพลง**: เลือกช่วงด้วยสไลเดอร์ → "ฟัง" เล่นเฉพาะช่วง (loop) · "บันทึกท่อน" = เพลงใหม่เล่นเฉพาะช่วง ·
+  **"ดาวน์โหลด .wav"** = ตัดจริงด้วย Web Audio (`bufferToWav`) ดาวน์โหลดไฟล์ได้ (ทดสอบผ่าน)
+- เพิ่ม collection `songs` (store + backend sync) · seed เดิม = "ตัวอย่าง" (ไม่มีไฟล์ · อัปจริงเพื่อเล่น)
+
+### เหลือทำ / ติดเครื่องมือ
+- ⚠️ ตาราง `rama9_songs` **ยังสร้างไม่ได้รอบนี้** (เครื่องมือ migration ของ Supabase ล่มชั่วคราว) →
+  metadata เพลง fallback เป็น localStorage อัตโนมัติ (ไม่พัง) · **ไฟล์เสียงขึ้นคลาวด์แล้ว** ·
+  สร้างตารางเมื่อเครื่องมือกลับมา: `create table rama9_songs (id text pk, data jsonb, updated_at timestamptz default now())` + RLS `rama9_all_write`
+- เพิ่มหน้าบันทึกยอดขายต่อเมนู → ปลดล็อก top/low sellers + forecast ให้เป็นข้อมูลจริง
+

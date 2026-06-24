@@ -10,8 +10,11 @@ import { pi } from "../components/icons.js";
 import { hdr, note, qtyInput, emptyState, dateBar } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { fmt } from "../utils/formulas.js";
-import { MONEY, INCOME_LOG, GP_PCT, TODAY } from "../data/seed.js";
+import { GP_PCT, TODAY } from "../data/seed.js";
 import { incomeRows, saveIncomeRecord } from "../data/store.js";
+
+// ช่องทางรายได้ (ตรงกับคีย์ GP_PCT) — รายการคงที่ ไม่ใช่ตัวเลขเดโม
+const CHANNELS = ["Grab", "Lineman", "Shopee", "หน้าร้าน", "อื่นๆ"];
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
@@ -29,11 +32,9 @@ export function incomeScreen(ctx) {
 
 // id ของบันทึก = วัน+ช่องทาง (เดือนเดียว) — บันทึกซ้ำวัน/ช่องทางเดิม = แก้ทับ
 function recId(day, ch) { return "inc-" + day + "-" + ch; }
-// รวมข้อมูลฐาน (seed) กับบันทึกจริงที่ขึ้นคลาวด์ — บันทึกจริงทับ seed
+// รวมรายการรายได้จริงของวัน (จากที่บันทึกจริงเท่านั้น — ไม่มี seed ปลอม)
 function mergedDay(day) {
   const out = {};
-  const seed = INCOME_LOG[day] || {};
-  for (const ch of Object.keys(seed)) out[ch] = { gross: seed[ch].gross, gp: Math.round(seed[ch].gross * (GP_PCT[ch] ?? 0)), mkt: seed[ch].mkt || 0, stored: false };
   for (const r of incomeRows()) if (r.day === day) out[r.ch] = { gross: r.gross, gp: r.gp || 0, mkt: r.mkt || 0, stored: true };
   return out;
 }
@@ -92,7 +93,7 @@ function paint(root) {
   grossIn.addEventListener("input", () => { const s = grossIn.value.replace(/[^0-9]/g, ""); if (s !== grossIn.value) grossIn.value = s; ist.gross = s; recompute(); });
 
   // channel chips
-  const chips = MONEY.channels.map((c) => h("button", {
+  const chips = CHANNELS.map((c) => h("button", {
     type: "button", class: "chip" + (ist.ch === c ? " active" : ""),
     onClick: () => { ist.ch = c; loadExisting(); paint(root); },
   }, dayLog[c] && pi("check", 12), c));

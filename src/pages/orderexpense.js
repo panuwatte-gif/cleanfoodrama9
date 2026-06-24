@@ -1,36 +1,53 @@
 // ============================================================
-// pages/orderexpense.js — ค่าใช้จ่ายสั่งอาหาร (เจ้าของ) · พอร์ตจาก prototype2 OrderExpenseScreen
-// ปฏิทินต้นทุนรับของรายวัน · แตะวัน → รายละเอียด + กรอกค่าส่ง (live · ไม่เสีย focus)
-// ต้นทุน/หน่วยดึงจากข้อมูลกลาง (ITEMS.cost) ผ่าน recvOf()
+// pages/orderexpense.js — ค่าใช้จ่ายสั่งอาหาร (เจ้าของ)
+//   ต้นทุนรับของจริง — อ่านจาก ledger รับเข้า (rama9_stock_counts · recv) ต่อวัน
+//   แตะวัน → รายละเอียด + กรอกค่าส่ง (เก็บถาวรใน localStorage cfr9:ship)
+//   ต้นทุน/หน่วยดึงจากข้อมูลกลาง (item.cost) · ยังไม่มีรับของ = empty state
 // ctx = { back, go, toast }
 // ============================================================
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { hdr, note, tag, itemIc } from "../components/components.js";
-import { fmt, itemById, recvOf, shipOf, setShipOf, RECV_DAYS } from "../utils/formulas.js";
-import { TODAY } from "../data/seed.js";
+import { hdr, note, tag, itemIc, emptyState } from "../components/components.js";
+import { fmt, itemById, unitOf } from "../utils/formulas.js";
+import { countsRows } from "../data/store.js";
+import { load, save } from "../utils/storage.js";
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
 const kBaht = (n) => (n >= 1000 ? (Math.round(n / 100) / 10).toFixed(1).replace(/\.0$/, "") + "k" : String(n));
-const oest = { openDay: null, shipMap: null, ctx: null };
+const TH_MON = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const fmtDate = (iso) => { const [, m, d] = iso.split("-").map(Number); return d + " " + TH_MON[m - 1]; };
+
+const oest = { openDay: null, ctx: null };
+
+// ---- ค่าส่งต่อวัน (เก็บถาวร) ----
+const SHIPK = "ship:v1";
+let _ship = null;
+const shipMap = () => (_ship || (_ship = load(SHIPK, {})));
+const shipOf = (date) => { const m = shipMap(); return m[date] === undefined ? null : m[date]; };
+const setShipOf = (date, v) => { const m = shipMap(); if (v == null) delete m[date]; else m[date] = v; save(SHIPK, m); };
+
+// ---- รอบรับของจริงจาก ledger ----
+function recvDates() {
+  return [...new Set(countsRows().filter((r) => (r.recv || 0) > 0).map((r) => r.date))].sort();
+}
+function recvOf(date) {
+  const rows = countsRows().filter((r) => r.date === date && (r.recv || 0) > 0);
+  if (!rows.length) return null;
+  const lines = rows.map((r) => { const it = itemById(r.item) || {}; const cost = it.cost || 0; return { id: r.item, name: it.name || r.item, qty: r.recv, unit: it.unit || (it.id ? unitOf(it) : ""), cost, sub: r.recv * cost }; })
+    .sort((a, b) => b.sub - a.sub);
+  const menuTotal = Math.round(lines.reduce((s, l) => s + l.sub, 0));
+  const ship = shipOf(date);
+  return { date, count: lines.length, lines, menuTotal, ship, total: menuTotal + (ship || 0) };
+}
 
 export function orderExpenseScreen(ctx) {
   oest.ctx = ctx;
   oest.openDay = null;
-  oest.shipMap = {};
-  RECV_DAYS.forEach((d) => { const v = shipOf(d); oest.shipMap[d] = v == null ? "" : String(v); });
   const root = h("div", { class: "page-wrap" });
   paint(root);
   return root;
-}
-
-function dayCalc(day) {
-  const r = recvOf(day); if (!r) return null;
-  const s = oest.shipMap[day];
-  const ship = s === "" || s == null ? null : num(s);
-  return { ...r, ship, total: r.menuTotal + (ship || 0) };
 }
 
 function paint(root) {
@@ -46,11 +63,10 @@ function ln(l, v, col, b) {
 }
 
 function paintDetail(root) {
-  const { go } = oest.ctx;
   const day = oest.openDay;
-  const c = dayCalc(day);
+  const c = recvOf(day);
+  if (!c) { oest.openDay = null; paint(root); return; }
 
-  // live spans
   const bigTotal = h("div", { class: "big-num tnum", style: { fontSize: "28px", color: "var(--warning-ink)", margin: "2px 0 8px" } });
   const sumShip = h("span", { class: "tnum", style: { fontWeight: 700, fontSize: "14px" } });
   const sumTotal = h("span", { class: "tnum", style: { fontWeight: 800, fontSize: "19px", color: "var(--warning-ink)" } });
@@ -58,11 +74,10 @@ function paintDetail(root) {
   const tfShip = h("td", { class: "tnum", style: { textAlign: "right", padding: "2px 0", fontWeight: 700, fontSize: "13px" } });
   const tfTotal = h("td", { class: "tnum", style: { textAlign: "right", padding: "6px 0 4px", fontWeight: 800, fontSize: "16px", color: "var(--warning-ink)" } });
   const sumShipLabel = h("span", { style: { fontSize: "13px", fontWeight: 500, color: "var(--muted)" } }, "ค่าส่ง");
-
-  const shipIn = h("input", { type: "text", inputMode: "numeric", class: "input tnum", style: { fontSize: "22px", fontWeight: 700 }, placeholder: "กรอกค่าส่ง…", value: oest.shipMap[day] || "" });
+  const shipIn = h("input", { type: "text", inputMode: "numeric", class: "input tnum", style: { fontSize: "22px", fontWeight: 700 }, placeholder: "กรอกค่าส่ง…", value: c.ship == null ? "" : String(c.ship) });
 
   function refresh() {
-    const cc = dayCalc(day);
+    const cc = recvOf(day);
     bigTotal.textContent = "฿" + fmt(cc.total);
     sumTotal.textContent = "฿" + fmt(cc.total);
     sumShip.textContent = cc.ship == null ? "รอกรอก" : "฿" + fmt(cc.ship);
@@ -74,7 +89,7 @@ function paintDetail(root) {
   }
   shipIn.addEventListener("input", () => {
     const s = shipIn.value.replace(/[^0-9]/g, ""); if (s !== shipIn.value) shipIn.value = s;
-    oest.shipMap[day] = s; setShipOf(day, s === "" ? null : num(s)); refresh();
+    setShipOf(day, s === "" ? null : num(s)); refresh();
   });
 
   const rows = c.lines.map((l) => {
@@ -88,9 +103,9 @@ function paintDetail(root) {
   });
 
   root.replaceChildren(
-    hdr({ title: "รับของ · " + day + " มิ.ย.", sub: "ยืนยันรับของ " + c.time + " น. · " + c.count + " รายการ", onBack: () => { oest.openDay = null; paint(root); }, right: h("span", { class: "catic amber" }, pi("truck", 18)) }),
+    hdr({ title: "รับของ · " + fmtDate(day), sub: c.count + " รายการ", onBack: () => { oest.openDay = null; paint(root); }, right: h("span", { class: "catic amber" }, pi("truck", 18)) }),
     h("div", { class: "page stack" },
-      note([h("span", null, "ต้นทุน/หน่วยของทุกรายการ "), bold("ดึงจากการ์ดข้อมูลกลาง (แท็บรับของ)"), " — แก้ราคาที่ข้อมูลกลางแล้วยอดที่นี่อัปเดตตาม"], { iconName: "db" }),
+      note([h("span", null, "ต้นทุน/หน่วยของทุกรายการ "), bold("ดึงจากการ์ดข้อมูลกลาง"), " — แก้ราคาที่ข้อมูลกลางแล้วยอดที่นี่อัปเดตตาม"], { iconName: "db" }),
       h("div", { class: "card soft-card soft-amber" },
         h("div", { class: "overline", style: { color: "#92560B" } }, "ค่าใช้จ่ายรวมรอบนี้"),
         bigTotal,
@@ -98,8 +113,7 @@ function paintDetail(root) {
         ln("ค่าใช้จ่ายรายเมนู", "฿" + fmt(c.menuTotal)),
         h("div", { class: "split", style: { padding: "4px 0" } }, sumShipLabel, sumShip),
         h("div", { class: "hr", style: { margin: "4px 0 0" } }),
-        h("div", { class: "split", style: { padding: "8px 0 2px" } },
-          h("span", { style: { fontSize: "14px", fontWeight: 800 } }, "รวมทั้งหมด"), sumTotal),
+        h("div", { class: "split", style: { padding: "8px 0 2px" } }, h("span", { style: { fontSize: "14px", fontWeight: 800 } }, "รวมทั้งหมด"), sumTotal),
       ),
       h("div", { class: "card" },
         h("div", { class: "split", style: { marginBottom: "8px" } },
@@ -141,28 +155,28 @@ function paintDetail(root) {
 
 function paintCalendar(root) {
   const { back } = oest.ctx;
-  // month aggregate (ใช้ค่าส่งจาก shipMap)
-  let menu = 0, ship = 0, pending = 0;
-  RECV_DAYS.forEach((d) => { const c = dayCalc(d); menu += c.menuTotal; ship += (c.ship || 0); if (c.ship == null) pending++; });
-  const mt = { menu, ship, total: menu + ship, batches: RECV_DAYS.length, pending };
+  const dates = recvDates();
 
-  const calCells = [];
-  for (let d = 1; d <= 30; d++) {
-    const c = dayCalc(d);
-    const future = d > TODAY.d;
-    if (!c) { calCells.push(h("div", { class: "oe-day empty" + (future ? " future" : "") }, h("span", { class: "dn" }, String(d)))); continue; }
-    calCells.push(h("button", { type: "button", class: "oe-day has" + (d === TODAY.d ? " today" : ""), onClick: () => { oest.openDay = d; paint(root); } },
-      h("span", { class: "dn" }, String(d), c.ship == null && h("i", { class: "pend-dot", "aria-label": "รอกรอกค่าส่ง" })),
-      h("span", { class: "amt tnum" }, "฿" + kBaht(c.total)),
-    ));
+  if (!dates.length) {
+    root.replaceChildren(
+      hdr({ title: "ค่าใช้จ่ายสั่งอาหาร", sub: "ต้นทุนรับของรายวัน", onBack: back, right: h("span", { class: "owner-tag" }, pi("lock", 11), "เจ้าของ") }),
+      h("div", { class: "page stack" },
+        emptyState({ iconName: "truck", title: "ยังไม่มีรอบรับของ", sub: 'บันทึกที่ "สั่งของ / รับของ" (หน้าแรก) — ระบบดึงต้นทุน/หน่วยจากข้อมูลกลางมาคิดเป็นค่าใช้จ่ายให้อัตโนมัติ' }),
+      ),
+    );
+    return;
   }
 
-  const allRows = [...RECV_DAYS].reverse().map((d, i, arr) => {
-    const c = dayCalc(d);
+  let menu = 0, ship = 0, pending = 0;
+  dates.forEach((d) => { const c = recvOf(d); menu += c.menuTotal; ship += (c.ship || 0); if (c.ship == null) pending++; });
+  const total = menu + ship;
+
+  const allRows = [...dates].reverse().map((d, i, arr) => {
+    const c = recvOf(d);
     return h("button", { type: "button", class: "rowflex list-press", style: { width: "100%", border: 0, background: "transparent", textAlign: "left", padding: "12px 2px", borderBottom: i < arr.length - 1 ? "1px solid var(--border-soft)" : "none" }, onClick: () => { oest.openDay = d; paint(root); } },
       h("span", { class: "catic amber sm" }, pi("truck", 15)),
       h("span", { style: { flex: 1, minWidth: 0 } },
-        h("span", { style: { display: "block", fontWeight: 700, fontSize: "14px" } }, d + " มิ.ย. · " + c.count + " รายการ"),
+        h("span", { style: { display: "block", fontWeight: 700, fontSize: "14px" } }, fmtDate(d) + " · " + c.count + " รายการ"),
         h("span", { class: "tnum", style: { display: "block", fontSize: "11.5px", color: "var(--muted)" } }, "เมนู ฿" + fmt(c.menuTotal) + " · ค่าส่ง " + (c.ship == null ? "รอกรอก" : "฿" + fmt(c.ship))),
       ),
       h("span", { class: "tnum", style: { fontWeight: 800, fontSize: "14.5px", color: "var(--warning-ink)" } }, "฿" + fmt(c.total)),
@@ -171,28 +185,20 @@ function paintCalendar(root) {
   });
 
   root.replaceChildren(
-    hdr({ title: "ค่าใช้จ่ายสั่งอาหาร", sub: "ต้นทุนรับของรายวัน · มิ.ย. 2569", onBack: back, right: h("span", { class: "owner-tag" }, pi("lock", 11), "เจ้าของ") }),
+    hdr({ title: "ค่าใช้จ่ายสั่งอาหาร", sub: "ต้นทุนรับของจริง · ทุกรอบ", onBack: back, right: h("span", { class: "owner-tag" }, pi("lock", 11), "เจ้าของ") }),
     h("div", { class: "page stack" },
-      note([h("span", null, "ทุกครั้งที่พนักงานกด "), bold('"ยืนยันรับของ"'), " (หน้าแรก → สั่งของ/รับของ) ระบบดึง", bold("ต้นทุน/หน่วยจากข้อมูลกลาง"), "มาคิดเป็นค่าใช้จ่าย — แตะวันในปฏิทินเพื่อดูรายละเอียด"], { iconName: "truck" }),
+      note([h("span", null, "ทุกครั้งที่กด "), bold('"ยืนยันรับของ"'), " ระบบดึง", bold("ต้นทุน/หน่วยจากข้อมูลกลาง"), "มาคิดเป็นค่าใช้จ่าย — แตะรอบเพื่อดูรายละเอียด + กรอกค่าส่ง"], { iconName: "truck" }),
       h("div", { class: "card soft-card soft-amber" },
-        h("div", { class: "split" }, h("span", { class: "overline", style: { color: "#92560B" } }, "ค่าใช้จ่ายสั่งอาหารรวม · เดือนนี้"), tag(mt.batches + " รอบ", { kind: "warn", iconName: "truck" })),
-        h("div", { class: "big-num tnum", style: { fontSize: "28px", color: "var(--warning-ink)", margin: "4px 0 10px" } }, "฿" + fmt(mt.total)),
+        h("div", { class: "split" }, h("span", { class: "overline", style: { color: "#92560B" } }, "ค่าใช้จ่ายสั่งอาหารรวม"), tag(dates.length + " รอบ", { kind: "warn", iconName: "truck" })),
+        h("div", { class: "big-num tnum", style: { fontSize: "28px", color: "var(--warning-ink)", margin: "4px 0 10px" } }, "฿" + fmt(total)),
         h("div", { class: "rowflex", style: { gap: "10px" } },
-          h("div", { style: { flex: 1, textAlign: "center" } }, h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "รายเมนู (วัตถุดิบ)"), h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--primary-dark)" } }, "฿" + fmt(mt.menu))),
+          h("div", { style: { flex: 1, textAlign: "center" } }, h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "รายเมนู (วัตถุดิบ)"), h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--primary-dark)" } }, "฿" + fmt(menu))),
           h("span", { class: "tnum", style: { color: "var(--faint)", fontSize: "16px" } }, "+"),
-          h("div", { style: { flex: 1, textAlign: "center" } }, h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ค่าส่งรวม"), h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--text)" } }, "฿" + fmt(mt.ship))),
+          h("div", { style: { flex: 1, textAlign: "center" } }, h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ค่าส่งรวม"), h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--text)" } }, "฿" + fmt(ship))),
         ),
       ),
-      mt.pending > 0 && note([h("span", null, "มี "), bold(mt.pending + " รอบ"), " ที่ยัง", bold("ไม่ได้กรอกค่าส่ง"), " — แตะวันที่มีจุดส้มเพื่อกรอกให้ครบ"], { amber: true }),
-      h("div", { class: "card", style: { padding: "14px" } },
-        h("div", { class: "oe-grid", style: { marginBottom: "4px" } }, ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"].map((w) => h("div", { class: "cal-dow" }, w))),
-        h("div", { class: "oe-grid" }, calCells),
-        h("div", { class: "rowflex", style: { gap: "14px", marginTop: "10px", fontSize: "11.5px", color: "var(--muted)", flexWrap: "wrap" } },
-          h("span", { class: "rowflex", style: { gap: "5px" } }, h("i", { style: { width: "8px", height: "8px", borderRadius: "3px", background: "#FDFBF4", border: "1px solid #EAD9B0" } }), "มีรับของ"),
-          h("span", { class: "rowflex", style: { gap: "5px" } }, h("i", { style: { width: "6px", height: "6px", borderRadius: "99px", background: "var(--warning)" } }), "รอกรอกค่าส่ง"),
-        ),
-      ),
-      h("div", { class: "overline" }, "รอบรับของทั้งหมด · เดือนนี้"),
+      pending > 0 && note([h("span", null, "มี "), bold(pending + " รอบ"), " ที่ยัง", bold("ไม่ได้กรอกค่าส่ง")], { amber: true }),
+      h("div", { class: "overline" }, "รอบรับของทั้งหมด"),
       h("div", { class: "card", style: { padding: "4px 16px" } }, allRows),
       note([bold("เชื่อมหน้าแรก:"), " รายการ + จำนวน มาจาก \"ยืนยันรับของ\" · ต้นทุน/หน่วย มาจาก", bold("ข้อมูลกลาง"), " · ค่าส่งเจ้าของกรอกเอง"]),
     ),

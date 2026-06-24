@@ -61,10 +61,15 @@ export const CONFIG = {
     usersSafe: "rama9_users_safe",      // อ่านรายชื่อแบบไม่มีรหัส (หลังปิด RLS)
     tasks: "rama9_tasks",                     // งานที่มอบหมาย + โน้ต/ประกาศ (assignee/assigner)
     manual: "rama9_manual",                   // คู่มือพนักงาน (เจ้าของแก้/เพิ่ม/ลบ)
+    payroll: "rama9_payroll",                 // ค่าแรงพนักงาน (รายวัน/เงินเดือน + OT)
+    songs: "rama9_songs",                     // เพลงร้าน (metadata · ไฟล์เสียงอยู่ใน Storage)
+    priceList: "rama9_price_list",            // เมนู·ราคาขาย — ตารางเดี่ยว standalone (จดโปร · ไม่มี FK)
   },
 
   // Storage bucket for expense receipt images (Supabase Storage, private).
   RECEIPTS_BUCKET: "rama9-receipts",
+  // Public bucket reused for user-uploaded media (item photos + audio files).
+  AUDIO_BUCKET: "item-images",
 
   // --- Feature flags — flip behaviour without touching page code ---
   FEATURE_FLAGS: {

@@ -8,14 +8,13 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { searchBox, note, tag, itemIc, menuTabs, hdr, meter, toggle, qtyInput, emo } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
-import { sectionsFor, stockOf, stockVariants, itemById, unitOf } from "../utils/formulas.js";
-import { cats, items as allItems } from "../data/store.js";
-import { STOCK_SEED } from "../data/seed.js";
+import { sectionsFor, stockOf, stockVariants, itemById, unitOf, threshOf } from "../utils/formulas.js";
+import { cats, items as allItems, stockRows, editStockQty, setStockThreshold } from "../data/store.js";
 
 const st = {
   lowOnly: false, top: "all", sub: "all", openItem: null, q: "",
   alertSheet: false, editStock: null, qty: {}, lineOn: true,
-  thresh: Object.fromEntries(STOCK_SEED.map((s) => [s.id, String(Math.round(s.use * 2 * 10) / 10)])),
+  thresh: {},
   ctx: null,
 };
 
@@ -171,7 +170,7 @@ function renderSheets(root) {
         note("ปรับยอดที่นี่จะเก็บ audit (ใคร·เมื่อไหร่) — ใช้ตอนนับเพิ่มระหว่างวัน"),
         h("div", { class: "rowflex", style: { gap: "10px", marginTop: "14px" } },
           h("button", { type: "button", class: "btn btn-block", onClick: () => { st.editStock = null; renderSheets(root); } }, "ยกเลิก"),
-          h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => { st.editStock = null; ctx.toast("ปรับคงเหลือ " + it.name + " แล้ว"); paint(root); } }, pi("check", 16), "บันทึก"),
+          h("button", { type: "button", class: "btn btn-primary btn-block", onClick: async () => { const v = st.qty[id]; st.editStock = null; await editStockQty(id, Number(v || 0), ctx.user ? ctx.user.name : "เจ้าของ"); delete st.qty[id]; ctx.toast("ปรับคงเหลือ " + it.name + " แล้ว"); paint(root); } }, pi("check", 16), "บันทึก"),
         ),
       ),
     }));
@@ -189,18 +188,19 @@ function renderSheets(root) {
         ),
         h("div", { class: "overline", style: { margin: "12px 0 0" } }, "ตั้งเกณฑ์รายตัว (เหลือเท่าไหร่ถึงเตือน)"),
         h("div", { class: "card", style: { padding: "2px 14px", maxHeight: "260px", overflowY: "auto", marginTop: "6px" } },
-          STOCK_SEED.map((s) => {
+          stockRows().map((s) => {
             const it = itemById(s.id);
+            if (!it) return null;
             return h("div", { class: "rowflex", style: { padding: "9px 0", borderBottom: "1px solid var(--border-soft)" } },
               itemIc(it),
               h("span", { style: { flex: 1, fontSize: "13.5px" } }, it.name),
-              qtyInput({ value: st.thresh[s.id] || "", onChange: (v) => { st.thresh[s.id] = v; } }),
+              qtyInput({ value: st.thresh[s.id] != null ? st.thresh[s.id] : String(threshOf(s.id)), onChange: (v) => { st.thresh[s.id] = v; } }),
               h("span", { style: { fontSize: "11.5px", color: "var(--faint)", width: "38px" } }, unitOf(it)),
             );
           }),
         ),
         note(['ค่ากลาง "เหลือใช้ได้กี่วันถึงเตือน" ตั้งได้ที่ ', bold("เพิ่มเติม → assumption"), " · ตรงนี้ปรับรายตัวทับค่ากลาง"], { amber: true }),
-        h("button", { type: "button", class: "btn btn-primary btn-block", style: { marginTop: "12px" }, onClick: () => { st.alertSheet = false; ctx.toast("บันทึกเกณฑ์แจ้งเตือนแล้ว"); paint(root); } }, pi("check", 16), "บันทึกเกณฑ์"),
+        h("button", { type: "button", class: "btn btn-primary btn-block", style: { marginTop: "12px" }, onClick: async () => { for (const [tid, v] of Object.entries(st.thresh)) { await setStockThreshold(tid, v); } st.alertSheet = false; ctx.toast("บันทึกเกณฑ์แจ้งเตือนแล้ว"); paint(root); } }, pi("check", 16), "บันทึกเกณฑ์"),
       ),
     }));
   }

@@ -112,6 +112,66 @@ function niceCeil(v) {
 }
 const kLabel = (v) => (v >= 1000 ? Math.round(v / 1000) + "K" : String(Math.round(v)));
 
+/* ---------- โดนัท: สัดส่วนรายได้ตามช่องทาง ---------- */
+export function pieChart(segs, { size = 132, thickness = 26 } = {}) {
+  const live = (segs || []).filter((s) => s.value > 0);
+  const total = live.reduce((s, x) => s + x.value, 0) || 1;
+  const r = size / 2, cx = r, cy = r, ir = r - thickness;
+  const svg = svgEl("svg", { class: "pie", viewBox: `0 0 ${size} ${size}`, width: size, height: size });
+  svg.style.flex = "none";
+  if (live.length === 1) {
+    // 100% เดียว → วงแหวนเต็ม (outer fill + inner bg)
+    svg.appendChild(svgEl("circle", { cx, cy, r, fill: live[0].color }));
+    svg.appendChild(svgEl("circle", { cx, cy, r: ir, fill: "var(--surface)" }));
+    return svg;
+  }
+  let a0 = -Math.PI / 2;
+  const P = (ang, rad) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)];
+  live.forEach((seg) => {
+    const frac = seg.value / total;
+    const a1 = a0 + frac * Math.PI * 2;
+    const large = frac > 0.5 ? 1 : 0;
+    const [x0, y0] = P(a0, r), [x1, y1] = P(a1, r), [x2, y2] = P(a1, ir), [x3, y3] = P(a0, ir);
+    const d = `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} A${ir} ${ir} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
+    svg.appendChild(svgEl("path", { class: "pie-seg", d, fill: seg.color }));
+    a0 = a1;
+  });
+  return svg;
+}
+
+/* ---------- แท่งเดี่ยว: ยอดขายรวมรายวัน (สเกลของตัวเอง) ---------- */
+export function barChart(data, { h = 118, color = "#54AE7B" } = {}) {
+  const W = 320, H = h, padT = 12, padB = 18, padR = 4, padL = 22;
+  const n = data.length || 1;
+  const max = niceCeil(Math.max(...data.map((d) => d.v), 1));
+  const base = H - padB;
+  const innerW = W - padL - padR;
+  const gap = Math.min(9, innerW / n * 0.32);
+  const bw = Math.max(5, (innerW - gap * (n - 1)) / n);
+  const y = (v) => padT + (1 - v / max) * (H - padT - padB);
+  const svg = svgEl("svg", { class: "barchart", viewBox: `0 0 ${W} ${H}` });
+  svg.style.height = H + "px";
+  [0, 0.5, 1].forEach((t) => {
+    const gv = max * t, gy = y(gv);
+    svg.appendChild(svgEl("line", { class: t === 0 ? "axis" : "grid-r", x1: padL, y1: gy, x2: W - padR, y2: gy }));
+    const lb = svgEl("text", { class: "tick-r", x: padL - 3, y: gy + 3, "text-anchor": "end" });
+    lb.textContent = kLabel(gv);
+    svg.appendChild(lb);
+  });
+  const every = Math.ceil(n / 7) || 1;
+  data.forEach((d, i) => {
+    const x = padL + i * (bw + gap);
+    const ph = Math.max(2, base - y(d.v));
+    svg.appendChild(svgEl("rect", { x: x.toFixed(1), y: y(d.v).toFixed(1), width: bw.toFixed(1), height: ph.toFixed(1), rx: Math.min(3, bw / 2.5), fill: color }));
+    if (i % every === 0 || i === n - 1) {
+      const t = svgEl("text", { class: "axis-lbl", x: (x + bw / 2).toFixed(1), y: H - 5, "text-anchor": "middle" });
+      t.textContent = d.label;
+      svg.appendChild(t);
+    }
+  });
+  return svg;
+}
+
 export function branchCombo({ days, branches, h = 168, fmt = (x) => x } = {}) {
   const W = 332, H = h, padL = 6, padR = 33, padB = 19, padT = 22;
   const n = days.length;

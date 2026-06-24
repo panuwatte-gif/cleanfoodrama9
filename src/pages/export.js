@@ -10,9 +10,9 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, seg, toggle } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
-import { itemById, unitOf } from "../utils/formulas.js";
-import { STOCK_SEED, MONEY, TODAY } from "../data/seed.js";
-import { menus, items } from "../data/store.js";
+import { itemById, unitOf, stockOf } from "../utils/formulas.js";
+import { TODAY } from "../data/seed.js";
+import { menus, items, incomeRows, expenseRows } from "../data/store.js";
 import { getEditLogs } from "../data/editlog.js";
 
 const DATASETS = [
@@ -45,9 +45,14 @@ const rowsToCsv = (rows) => rows.map((r) => r.map(csvCell).join(",")).join("\n")
 function datasetRows(id) {
   try {
     if (id === "stock")
-      return [["รายการ", "คงเหลือ", "หน่วย"], ...STOCK_SEED.map((s) => { const it = itemById(s.id); return [it ? it.name : s.id, s.qty, it ? unitOf(it) : ""]; })];
-    if (id === "money")
-      return [["วันที่", "รายรับ (บาท)", "รายจ่าย (บาท)"], ...Object.keys(MONEY.days).map((d) => [d + " " + TODAY.mon, MONEY.days[d].in, MONEY.days[d].ex])];
+      return [["รายการ", "คงเหลือ", "หน่วย"], ...(items() || []).filter((it) => it.isActive !== false).map((it) => { const s = stockOf(it.id); return [it.name, s.qty, unitOf(it)]; })];
+    if (id === "money") {
+      const days = {};
+      for (const r of incomeRows()) { const d = r.day; (days[d] || (days[d] = { in: 0, ex: 0 })).in += (r.net != null ? r.net : (r.gross || 0)); }
+      for (const r of expenseRows()) { const d = r.day; (days[d] || (days[d] = { in: 0, ex: 0 })).ex += (r.amount || 0); }
+      const ks = Object.keys(days).map(Number).sort((a, b) => a - b);
+      return [["วันที่", "รายรับ (บาท)", "รายจ่าย (บาท)"], ...ks.map((d) => [d + " " + TODAY.mon, days[d].in, days[d].ex])];
+    }
     if (id === "menu") {
       const m = menus() || [];
       return [["เมนู", "ราคา"], ...m.map((x) => [x.name, x.price ?? x.priceSell ?? ""])];
@@ -164,11 +169,11 @@ function paint(root) {
           h("div", { class: "rowflex" },
             h("span", { class: "catic teal" }, pi("cloud", 18)),
             h("div", { style: { minWidth: 0 } },
-              h("div", { style: { fontWeight: 800, fontSize: "14.5px" } }, "สำรองล่าสุด"),
-              h("div", { style: { fontSize: "12px", color: "var(--muted)" } }, "วันนี้ " + TODAY.d + " " + TODAY.mon + " · 08:20 น."),
+              h("div", { style: { fontWeight: 800, fontSize: "14.5px" } }, "สำรองข้อมูลทั้งหมด"),
+              h("div", { style: { fontSize: "12px", color: "var(--muted)" } }, "ดาวน์โหลดเป็นไฟล์ .json — เก็บไว้กันข้อมูลหาย/ย้ายเครื่อง"),
             ),
           ),
-          h("span", { class: "badge badge-green" }, pi("check", 10), "ซิงค์แล้ว"),
+          h("span", { class: "badge badge-green" }, pi("cloud", 10), "ซิงค์คลาวด์"),
         ),
         h("button", { type: "button", class: "btn btn-primary btn-block", onClick: doBackup }, pi("down", 16), "สำรองเป็นไฟล์ตอนนี้"),
         h("div", { class: "split", style: { marginTop: "12px" } },
@@ -203,7 +208,7 @@ function paint(root) {
         fileIn,
       ),
 
-      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "10px 0 0" } }, "ข้อมูลเดโมเก็บในเครื่อง · เมื่อเชื่อม Supabase จะสำรองขึ้นคลาวด์อัตโนมัติ"),
+      h("p", { style: { fontSize: "11px", color: "var(--faint)", textAlign: "center", margin: "10px 0 0" } }, "ข้อมูลซิงค์ขึ้น Supabase อัตโนมัติแล้ว · ไฟล์สำรองนี้ไว้เก็บออฟไลน์/ย้ายเครื่อง"),
     ),
   );
 }

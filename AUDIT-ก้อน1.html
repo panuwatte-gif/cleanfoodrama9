@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ก้อน 1 — ตรวจความจริงทุกหน้า · CleanFoodRama9</title>
+<style>
+  :root{
+    --bg:#0f1311; --panel:#161b18; --panel2:#1b211d; --line:#2a322c;
+    --ink:#e8efe9; --mut:#9fb0a4; --faint:#6f8174;
+    --ok:#4ea877; --okbg:#16271f; --okln:#27543c;
+    --empty:#5b9bd5; --emptybg:#16212c; --emptyln:#274056;
+    --demo:#e0824a; --demobg:#2a1c12; --demoln:#5a3520;
+    --blank:#8b7fae; --blankbg:#211c2b; --blankln:#3c3450;
+    --warn:#e0b84a;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,"Segoe UI","Noto Sans Thai",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{padding:34px 22px 80px;line-height:1.5}
+  .wrap{max-width:1060px;margin:0 auto}
+  h1{font-size:25px;margin:0 0 4px;letter-spacing:-.2px}
+  .sub{color:var(--mut);font-size:13.5px;margin-bottom:2px}
+  .meta{color:var(--faint);font-size:12px;font-family:var(--mono);margin-bottom:24px}
+  .meta b{color:var(--ok)}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:1.4px;color:var(--mut);margin:32px 0 12px;font-weight:700}
+
+  /* evidence */
+  .evgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.evgrid{grid-template-columns:1fr}.evtbl{grid-column:auto}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .card h3{margin:0 0 10px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .rows{font-family:var(--mono);font-size:12.5px}
+  .rows .r{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)}
+  .rows .r:last-child{border-bottom:none}
+  .rows .n{font-weight:700}
+  .n0{color:var(--demo)} .npos{color:var(--ok)}
+  .tagmiss{color:var(--demo);font-weight:700}
+
+  .crux{background:linear-gradient(180deg,#2a1c12,#1d1610);border:1px solid var(--demoln);border-radius:14px;padding:18px 20px;margin:18px 0 8px}
+  .crux b{color:var(--demo)}
+  .crux .formula{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:#0c0f0d;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0 4px;overflow-x:auto}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 18px}
+  .lg{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:5px 12px;background:var(--panel)}
+  .lg b{font-weight:700}
+  .sok{color:var(--ok)} .sempty{color:var(--empty)} .sdemo{color:var(--demo)} .sblank{color:var(--blank)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;color:var(--faint);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.8px;padding:0 12px 8px;border-bottom:1px solid var(--line)}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:var(--panel)}
+  .pg{font-weight:700;font-size:13.5px}
+  .pg small{display:block;color:var(--faint);font-weight:400;font-size:11.5px;font-family:var(--mono);margin-top:1px}
+  .st{white-space:nowrap;font-weight:700;font-size:12.5px;display:inline-flex;align-items:center;gap:7px;padding:3px 10px;border-radius:8px}
+  .st-ok{color:var(--ok);background:var(--okbg);border:1px solid var(--okln)}
+  .st-empty{color:var(--empty);background:var(--emptybg);border:1px solid var(--emptyln)}
+  .st-demo{color:var(--demo);background:var(--demobg);border:1px solid var(--demoln)}
+  .st-blank{color:var(--blank);background:var(--blankbg);border:1px solid var(--blankln)}
+  .ev{color:var(--mut);font-size:12.5px}
+  .ev code{font-family:var(--mono);font-size:11.5px;color:var(--ink);background:#0c0f0d;border:1px solid var(--line);padding:1px 5px;border-radius:5px}
+  .fix{color:var(--mut);font-size:12.5px}
+  .fix b{color:var(--ink);font-weight:600}
+  .sec-row td{background:#11150f;border-bottom:1px solid var(--line)}
+  .sec-row .lab{font-weight:700;font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+
+  .count-bar{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid var(--line);margin:6px 0 0;height:34px}
+  .cseg{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0c0f0d;gap:6px}
+
+  .gate{background:var(--panel);border:1px dashed var(--okln);border-left:3px solid var(--ok);border-radius:12px;padding:18px 20px;margin-top:26px}
+  .gate h3{margin:0 0 8px;font-size:15px;color:var(--ok)}
+  .gate ol{margin:8px 0 0;padding-left:20px;color:var(--mut);font-size:13px}
+  .gate li{margin:5px 0}
+  .gate li b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>ก้อน 1 — ตรวจความจริงทุกหน้า ก่อนแก้</h1>
+  <div class="sub">CleanFoodRama9 · vanilla app ใน <code>Rama9_app/</code> · ทุกหน้าจัดเป็น 1 ใน 4 สถานะ</div>
+  <div class="meta">หลักฐาน = รัน SQL จริงเข้า Supabase <b>Stock Tracker</b> (qxhvmrxbrrweundfspzp · ap-northeast-1) · 24 มิ.ย. 2569 · <b>ยังไม่แก้โค้ดใดๆ</b></div>
+
+  <!-- ============ หลักฐานจาก DB จริง ============ -->
+  <h2>หลักฐาน — นับแถวจริงในตาราง rama9_* (รันสด)</h2>
+  <div class="evgrid">
+    <div class="card">
+      <h3><span class="dot" style="background:var(--ok)"></span>ตารางข้อมูลกลาง — มีข้อมูล (seed)</h3>
+      <div class="rows">
+        <div class="r"><span>rama9_item_master</span><span class="n npos">56</span></div>
+        <div class="r"><span>rama9_categories</span><span class="n npos">7</span></div>
+        <div class="r"><span>rama9_menus</span><span class="n npos">15</span></div>
+        <div class="r"><span>rama9_assumptions</span><span class="n npos">11</span></div>
+        <div class="r"><span>rama9_stock_items</span><span class="n npos">7</span></div>
+        <div class="r"><span>rama9_users</span><span class="n npos">7</span></div>
+        <div class="r"><span>rama9_tasks</span><span class="n npos">7</span></div>
+        <div class="r"><span>rama9_payroll</span><span class="n npos">4</span></div>
+        <div class="r"><span>rama9_recipes</span><span class="n npos">3</span></div>
+        <div class="r"><span>rama9_edit_logs</span><span class="n npos">14</span></div>
+        <div class="r"><span>rama9_nutrition_menu / ingredient</span><span class="n npos">13 / 22</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:var(--demo)"></span>ตารางเดินรายการ — <b style="color:var(--demo)">ว่างเปล่า 0 แถว</b></h3>
+      <div class="rows">
+        <div class="r"><span>rama9_income <span style="color:var(--faint)">— ยอดขายจริง</span></span><span class="n n0">0</span></div>
+        <div class="r"><span>rama9_expenses <span style="color:var(--faint)">— ค่าใช้จ่ายจริง</span></span><span class="n n0">0</span></div>
+        <div class="r"><span>rama9_stock_counts / lines</span><span class="n n0">0 / 0</span></div>
+        <div class="r"><span>rama9_waste_logs</span><span class="n n0">0</span></div>
+        <div class="r"><span>rama9_orders / order_lines</span><span class="n n0">0 / 0</span></div>
+        <div class="r"><span>rama9_receipts / lines</span><span class="n n0">0 / 0</span></div>
+        <div class="r"><span>rama9_forecast_results</span><span class="n n0">0</span></div>
+        <div class="r"><span>rama9_settings</span><span class="n n0">0</span></div>
+        <div class="r"><span><b class="tagmiss">rama9_songs</b> <span style="color:var(--faint)">— ยังไม่มีตาราง</span></span><span class="n n0">ไม่มี</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ปมหลัก ============ -->
+  <div class="crux">
+    <div style="font-size:14.5px;font-weight:700;margin-bottom:6px">ปมที่ทำให้ "พยากรณ์ / ขายดี-ขายน้อย" ยังเป็นเดโม — และทางแก้จริง</div>
+    <div style="color:var(--mut);font-size:13px">
+      สูตรพยากรณ์ที่เจ้าของให้ <b>ไม่ต้องใช้ POS รายเมนู</b> — มันอนุมานยอดขายจาก <b>ผลต่างของการนับสต๊อกรายวัน</b> ตรงๆ:
+    </div>
+    <div class="formula">ขายไป(t) = คงเหลือ(t−1) + รับเข้า(t) − ของเสีย(t) − คงเหลือ(t)</div>
+    <div style="color:var(--mut);font-size:13px">
+      ปัญหาคือตอนนี้ <code style="font-family:var(--mono);color:var(--demo)">applyCount / applyReceive / applyWaste</code> ใน <code style="font-family:var(--mono)">store.js</code>
+      <b>เขียนทับคงเหลือปัจจุบันอย่างเดียว ไม่เก็บสแนปช็อตรายวัน</b> → ตาราง <code style="font-family:var(--mono)">rama9_stock_counts / waste_logs</code> เลย 0 แถว →
+      สูตรไม่มี <b>คงเหลือ(t−1)</b> ให้คำนวณ. <b style="color:var(--demo)">นี่ไม่ใช่ "ไม่มีข้อมูลเลยทำไม่ได้"</b> — ต้นทางมีจริง (การนับทุกวัน)
+      แค่ยังไม่ถูกบันทึกเป็นประวัติ. <b>ก้อน 2.3 = ต่อ apply* ให้ append แถวรายวัน แล้วเขียน engine ตามสูตรเป๊ะ</b> →
+      วันแรกที่เริ่มนับ ระบบคำนวณยอดขาย/พยากรณ์จากข้อมูลจริงทันที (ช่วง cold-start ใช้ค่าเฉลี่ยตามสเปก ขั้น 2.5).
+    </div>
+  </div>
+
+  <!-- ============ Legend ============ -->
+  <h2>ตารางตรวจ — ทุกหน้า (จัดเป็น 1 ใน 4 สถานะ)</h2>
+  <div class="legend">
+    <span class="lg"><b class="sok">✓ จริง</b> ใช้ข้อมูลจริง + ต่อ Supabase (มีหลักฐานรัน)</span>
+    <span class="lg"><b class="sempty">○ ว่างซื่อสัตย์</b> ยังไม่มีข้อมูล แต่ไม่มีเลขปลอม</span>
+    <span class="lg"><b class="sdemo">❗ เดโมหลุด</b> มี mock/seed ค้าง → ต้องแก้</span>
+    <span class="lg"><b class="sblank">▢ เว้นว่างตั้งใจ</b> (เกมส์) ปล่อยไว้</span>
+  </div>
+  <div class="count-bar">
+    <div class="cseg" style="background:var(--ok);flex:14">✓ 14</div>
+    <div class="cseg" style="background:var(--empty);flex:4">○ 4</div>
+    <div class="cseg" style="background:var(--demo);flex:12">❗ 12</div>
+    <div class="cseg" style="background:var(--blank);flex:1">▢ 1</div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:20%">หน้า</th><th style="width:13%">สถานะ</th><th style="width:34%">หลักฐาน (ผลรันจริง)</th><th style="width:33%">ติดตรงไหน / ต้องทำอะไร</th></tr></thead>
+    <tbody>
+
+      <tr class="sec-row"><td colspan="4"><span class="lab">สต๊อก · รับ-นับ-ทิ้ง (พนักงาน)</span></td></tr>
+
+      <tr><td class="pg">หน้าแรก<small>home</small></td>
+        <td><span class="st st-empty">○ ว่างซื่อสัตย์</span></td>
+        <td class="ev">การ์ดยอดขายเจ้าของอ่าน <code>incomeRows()/expenseRows()</code> จริง · DB 0 แถว → โชว์ "ยังไม่มีข้อมูลยอดขาย" + กราฟว่าง ไม่มีเลขปลอม</td>
+        <td class="fix">เหลือ <b>ลบ import ตาย</b> <code>MONEY · branchDailySales</code> ที่ไม่ถูกเรนเดอร์แล้ว (กันสับสน) — ก้อน 3</td></tr>
+
+      <tr><td class="pg">ตรวจนับ<small>count</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>applyCount()</code> เขียน <code>rama9_stock_items</code> จริง (set คงเหลือ + ปรับล็อต)</td>
+        <td class="fix"><b>ต้องเพิ่ม:</b> append สแนปช็อตวันนี้ลง <code>rama9_stock_counts</code> (ก้อน 2.3) — เป็นต้นทางพยากรณ์</td></tr>
+
+      <tr><td class="pg">สั่ง / รับของ<small>orderrecv</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>applyReceive()</code> บวกคงเหลือ + เพิ่มล็อตสด → Supabase · ส่ง LINE ใบสั่งผ่าน webhook</td>
+        <td class="fix">ลบโน้ตเดโม "สาขาหลักส่งมา 14 รายการ" · บันทึก receive รายวัน (ก้อน 2.3)</td></tr>
+
+      <tr><td class="pg">ทิ้ง / ของเสีย<small>waste</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>applyWaste()</code> ตัด FIFO จากคงเหลือจริง</td>
+        <td class="fix"><b>ต้องเพิ่ม:</b> append <code>rama9_waste_logs</code> รายวัน (ก้อน 2.3)</td></tr>
+
+      <tr><td class="pg">สินค้าคงเหลือ<small>stocklist</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev">อ่าน <code>stockOf()</code> สด · <code>editStockQty / setStockThreshold</code> persist จริง</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">รายละเอียดสต๊อก / ล็อต<small>stockdetail</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ล็อต FIFO จริง (<code>addLot/editLot/removeLot</code>) <b>แต่</b>โชว์ <code>SHRINK_DEMO</code> (ของหาย/ขายจริง = ตัวเลขปลอม)</td>
+        <td class="fix"><b>ลบ <code>SHRINK_DEMO</code></b> → คิด "ขายจริง" จากสูตรนับสต๊อก หรือซ่อนจนมีข้อมูล</td></tr>
+
+      <tr class="sec-row"><td colspan="4"><span class="lab">เงิน · รายรับ-จ่าย · ภาษี</span></td></tr>
+
+      <tr><td class="pg">รายรับ-จ่าย (ปฏิทิน)<small>money</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">เรนเดอร์ <code>MONEY.days</code> ทั้งปฏิทิน + ยอดสุทธิ <code>฿312,000 − ฿113,600</code> ทั้งที่ DB income/expense = <b>0 แถว</b></td>
+        <td class="fix"><b>เขียนใหม่:</b> ปฏิทินอ่าน <code>incomeRows()/expenseRows()</code> จริง · ว่าง = ช่องว่าง ไม่ใช่เลขปลอม</td></tr>
+
+      <tr><td class="pg">บันทึกรายได้<small>income</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev"><code>mergedDay()</code> ฉีด <code>INCOME_LOG</code> seed ลงหน้ากรอก (โชว์ยอดที่ไม่ได้บันทึกจริง) · บันทึกจริงทับได้ แต่ค่าเริ่มเป็นเดโม</td>
+        <td class="fix"><b>ตัด <code>INCOME_LOG</code> seed</b> ออก · ช่องทาง/GP% เก็บเป็น config ได้ · เริ่มจากว่างจริง</td></tr>
+
+      <tr><td class="pg">บันทึกค่าใช้จ่าย<small>expense</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">โชว์ <code>MONEY.todayExp</code> เป็นรายการที่ "บันทึกแล้ว" (ปลอม) · แนบรูปใบเสร็จ + saveExpenseRecord ทำงานจริง</td>
+        <td class="fix"><b>ตัด <code>MONEY.todayExp</code></b> → อ่านรายการจ่ายจริงต่อวันจาก store</td></tr>
+
+      <tr><td class="pg">ภาษี (คำนวณ+วางแผน)<small>tax</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ป้าย "ดึงข้อมูลจริงจากระบบ" <b>แต่</b>ค่าเริ่มมาจาก <code>MONEY.monthIncome 312,000</code> (seed) — สูตร PIT/CIT จริง อินพุตปลอม</td>
+        <td class="fix">ชี้รายได้/ต้นทุนไป income/expense จริง · ว่าง = 0 + บอกให้บันทึกก่อน</td></tr>
+
+      <tr><td class="pg">ต้นทุนรับของ (ปฏิทิน)<small>orderexpense</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev"><code>recvOf/shipOf</code> สร้างปฏิทินต้นทุนแบบ derive/เดโม ไม่ใช่ใบสั่งจริง</td>
+        <td class="fix">อ่านจาก receive จริง (เมื่อบันทึก receive รายวันแล้ว — ก้อน 2.3) หรือ empty</td></tr>
+
+      <tr><td class="pg">ส่งออก & สำรอง<small>export</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ชุดข้อมูล "สต๊อก/เงิน" ส่งออกจาก <code>STOCK_SEED</code> + <code>MONEY.days</code> (เดโม) ไม่ใช่ของจริง · กลไกไฟล์ .json/.csv ทำงานจริง</td>
+        <td class="fix">ชี้ export ไป store/Supabase จริง (stock สด · income/expense จริง)</td></tr>
+
+      <tr class="sec-row"><td colspan="4"><span class="lab">รายงาน · พยากรณ์</span></td></tr>
+
+      <tr><td class="pg">สรุปผู้บริหาร<small>execsummary</small></td>
+        <td><span class="st st-empty">○ ว่างซื่อสัตย์</span></td>
+        <td class="ev">อ่าน <code>incomeRows/expenseRows</code> จริง · มี <code>hasData</code> → empty state เมื่อ 0 แถว</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">รายงานรายรับ-จ่าย<small>incexpreport</small></td>
+        <td><span class="st st-empty">○ ว่างซื่อสัตย์</span></td>
+        <td class="ev"><code>realDaily()/realCum()</code> จาก income จริง · ว่าง = empty (กราฟผสม+จุดคุ้มทุนคิดสด)</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">มูลค่าสต๊อก (ในรายงาน)<small>stockreport</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">มูลค่ารวม = <code>realStockValue()</code> (คงเหลือ×ต้นทุน) <b>จริง</b> · <b>แต่</b>ตาราง "ผลนับ/ขายจริง" ใช้ <code>COUNT_RESULT</code> เดโม</td>
+        <td class="fix"><b>ตัด <code>COUNT_RESULT</code></b> → คิดขายจริงจากประวัติการนับ (ก้อน 2.3)</td></tr>
+
+      <tr><td class="pg">อันดับขายดี<small>topsellers</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ทั้งหน้าใช้ <code>TOP_FOOD · TOP_DRINK · DOW_SALES</code> (ตัวเลข hardcode)</td>
+        <td class="fix"><b>คิดจากยอดขายอนุมาน</b> (สูตรนับสต๊อก) จัดอันดับจริง · ว่าง = empty</td></tr>
+
+      <tr><td class="pg">ขายน้อย-ต้องดูแล<small>lowsellers</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ใช้ <code>BOTTOM_FOOD · BOTTOM_DRINK · DOW_SALES</code> เดโม</td>
+        <td class="fix">เหมือน topsellers — จัดอันดับจากยอดขายจริง (ก้อน 2.3)</td></tr>
+
+      <tr><td class="pg">พยากรณ์ 7 วัน<small>forecast</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev"><code>fc7()</code> เป็น hash-based เดโม · ตารางย้อนหลังใช้ <code>FC_HISTORY</code> · <b>ยังไม่ได้ใช้สูตรจริง</b></td>
+        <td class="fix"><b>เขียน engine ตามสูตรเป๊ะ</b> (weighted แยกวัน + cold-start + MAPE + จูน λ) อ่านประวัติการนับ · เก็บ error ลง <code>rama9_forecast_results</code></td></tr>
+
+      <tr><td class="pg">พยากรณ์ย้อนหลัง<small>fchistory</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">ตาราง back-test ใช้ <code>FC_HISTORY</code> hardcode</td>
+        <td class="fix">walk-forward backtest จากข้อมูลจริง (ก้อน 2.3 ขั้น 4)</td></tr>
+
+      <tr class="sec-row"><td colspan="4"><span class="lab">ข้อมูลกลาง · เมนู · ตั้งค่า (เจ้าของ)</span></td></tr>
+
+      <tr><td class="pg">ข้อมูลกลาง (CRUD)<small>master</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev">เพิ่ม/ลบ/แก้ชื่อ-ราคา-ไอคอน → <code>rama9_item_master</code> (56) · <code>rama9_categories</code> (7) · ทุกแก้ลง <code>rama9_edit_logs</code> (14 จริง)</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">เมนู · ราคาขาย<small>menulist</small></td>
+        <td><span class="st st-demo">❗ ต้องทำใหม่</span></td>
+        <td class="ev">อ่าน <code>rama9_menus</code> (15) จริง <b>แต่</b>ผูกข้อมูลกลาง (ชื่อไม่ตรงกัน พังตามที่เจ้าของบอก)</td>
+        <td class="fix"><b>ก้อน 2.2:</b> ทำใหม่เป็น <b>ตารางเดี่ยว standalone</b> (กับข้าว · ชนิดข้าว · ราคาตั้ง · ส่วนลด · สุทธิ) ไม่มี FK</td></tr>
+
+      <tr><td class="pg">ค่ากลางระบบ<small>assumptions</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>rama9_assumptions</code> (11) · แก้/เพิ่ม/ลบ persist + audit จริง</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">ค่าแรงพนักงาน<small>payroll</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>rama9_payroll</code> = 4 แถวจริง · กดบันทึก → <code>setPayroll</code> persist</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">ผู้ใช้ & รหัสผ่าน<small>users / teamCard</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>rama9_users</code> = 7 จริง · login PIN จริง · เพิ่ม/แก้/บล็อก persist</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">งาน & ข้อความ<small>messages</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>rama9_tasks</code> = 7 จริง · มอบงาน/อนุมัติ/รับทราบ persist</td>
+        <td class="fix">เนื้องาน 7 แถวเป็น <code>TASKS_SEED</code> เดโม → กวาดออกตอนก้อน 3</td></tr>
+
+      <tr><td class="pg">ประวัติ + audit<small>history</small></td>
+        <td><span class="st st-demo">❗ เดโมหลุด</span></td>
+        <td class="ev">โชว์ <code>RECORDS</code> (รายการเดโม) ปนกับ edit logs จริง (14)</td>
+        <td class="fix"><b>ตัด <code>RECORDS</code></b> → แสดงประวัติจริงจาก edit_logs + เดินรายการจริง</td></tr>
+
+      <tr><td class="pg">โภชนาการ<small>nutrition</small></td>
+        <td><span class="st st-empty">○ ค่าเริ่ม seed</span></td>
+        <td class="ev"><code>rama9_nutrition_menu/ingredient</code> (13/22) เป็นค่าประมาณ seed · เจ้าของแก้เป็นค่าจริงได้</td>
+        <td class="fix">ค่าเริ่มเป็นประมาณการ (ยอมรับได้) — ไม่ใช่ตัวเลขการเงินปลอม · คงไว้/ให้เจ้าของเติม</td></tr>
+
+      <tr><td class="pg">สูตร / สัดส่วน<small>recipes</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>rama9_recipes</code> = 3 จริง · เครื่องคิดสัดส่วนทำงานจาก data จริง</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">คู่มือพนักงาน<small>manual</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev"><code>MANUAL</code> seed เป็นค่าเริ่ม · เจ้าของเพิ่ม/แก้หัวข้อ persist จริง (เนื้อหา ไม่ใช่ตัวเลข)</td>
+        <td class="fix">—</td></tr>
+
+      <tr><td class="pg">แปลงหน่วย / ตั้งสี / hub ข้อมูล<small>unitconvert · colorsettings · data</small></td>
+        <td><span class="st st-ok">✓ จริง</span></td>
+        <td class="ev">คำนวณ/ธีม/นำทาง — ไม่มีข้อมูลธุรกิจปลอม (data hub ใช้ stockOf สด)</td>
+        <td class="fix">data hub มี <code>STOCK_SEED</code> import — ตรวจว่าไม่เรนเดอร์เลขปลอม (ก้อน 3)</td></tr>
+
+      <tr class="sec-row"><td colspan="4"><span class="lab">สื่อสาร · ส่งออก · เพลง · เกมส์</span></td></tr>
+
+      <tr><td class="pg">ส่งเข้า LINE<small>linesend / dailyreport</small></td>
+        <td><span class="st st-empty">○ ว่างซื่อสัตย์</span></td>
+        <td class="ev">UI + ยิง webhook จริง (ถ้าตั้ง <code>REPORT_WEBHOOK_URL</code>) · ข้อความตัวเลขยัง mirror เดโม</td>
+        <td class="fix">ผูกข้อความเข้า income/expense/stock จริง</td></tr>
+
+      <tr><td class="pg">เพลงร้าน<small>music</small></td>
+        <td><span class="st st-demo">❗ ค้างเครื่องมือ</span></td>
+        <td class="ev">อัปไฟล์เสียง→Storage + เล่น/ตัด จริง · <b>แต่</b>ตาราง <code class="tagmiss">rama9_songs ยังไม่มี</code> → metadata fallback localStorage · <code>PLAYLISTS</code> seed</td>
+        <td class="fix"><b>ก้อน 2.1:</b> สร้าง <code>rama9_songs</code> + sync จริง · แปลงเสียงเป็น MP3 ก่อนเก็บ · ตัด PLAYLISTS เดโม</td></tr>
+
+      <tr><td class="pg">เกมส์ (Dash sheet)<small>FAB กลาง</small></td>
+        <td><span class="st st-blank">▢ เว้นว่างตั้งใจ</span></td>
+        <td class="ev">ว่างเปล่าจริง ไม่มีต้นทางข้อมูล</td>
+        <td class="fix">ปล่อยไว้ — ห้ามแตะ (ตามสเปก)</td></tr>
+
+    </tbody>
+  </table>
+
+  <!-- ============ Gate ============ -->
+  <div class="gate">
+    <h3>ขอยืนยันก่อนเริ่มก้อน 2 — ยังไม่แตะโค้ดจนกว่าจะ OK</h3>
+    <div style="color:var(--mut);font-size:13px">สรุปงานที่จะลงมือ (ตามลำดับสเปก) เมื่อเจ้าของยืนยันตารางนี้:</div>
+    <ol>
+      <li><b>2.1 เพลง:</b> สร้างตาราง <code>rama9_songs</code> (รัน SQL ตรง) + sync รายชื่อขึ้นคลาวด์ · แปลงไฟล์เป็น <b>MP3 ก่อนเก็บ</b> (พิสูจน์ขนาด KB ก่อน/หลัง)</li>
+      <li><b>2.2 เมนู·ราคา:</b> ตารางเดี่ยว standalone (กับข้าว · ชนิดข้าว · ราคาตั้ง · ส่วนลด · สุทธิ) ไม่มี FK — จดโปรกันลืม</li>
+      <li><b>2.3 พยากรณ์:</b> ต่อ <code>count/recv/waste</code> ให้บันทึก<b>สแนปช็อตรายวัน</b> → เขียน engine ตามสูตรเป๊ะ → ปลดล็อก ขายดี/ขายน้อย/พยากรณ์ ให้เป็นจริง (cold-start ใช้ค่าเฉลี่ย)</li>
+      <li><b>2.4 บีบรูป:</b> ตรวจทุกจุดอัปรูป → ย่อ ≤1200px + WebP <b>ก่อนอัป</b> (พิสูจน์ขนาดจริงใน Storage)</li>
+      <li><b>ก้อน 3:</b> กวาด demo/seed ที่เหลือ (<code>MONEY · TOP/BOTTOM · DOW_SALES · COUNT_RESULT · INCOME_LOG · FC_HISTORY · RECORDS · SHRINK_DEMO</code>) ออกทุกหน้า → เหลือ empty state ซื่อสัตย์</li>
+    </ol>
+    <div style="color:var(--ink);font-size:13px;margin-top:12px">
+      <b>คำถามที่ต้องชัดก่อนลงมือ (กันทำผิดทาง):</b>
+      <ol style="color:var(--mut)">
+        <li>ก้อน 2.3 — ให้บันทึกสแนปช็อตการนับแยกเป็นตาราง <code>rama9_stock_counts</code> (1 แถว/วัน/รายการ) ตามที่ตารางมีอยู่ ใช่ไหม? หรือเก็บรวมใน lots ที่มีอยู่?</li>
+        <li>RLS — ปิดล็อกรอบสุดท้าย เจ้าของกั๊กไว้ทำพร้อม Supabase Auth จริง · จะให้ผมทำ Auth จริงในรอบนี้เลย หรือคงเปิด anon ไว้ก่อน?</li>
+        <li>MP3 ในเบราว์เซอร์ต้องโหลด ffmpeg.wasm (ก้อนใหญ่) — โอเคไหม หรือให้ทำ Edge Function แปลงฝั่งเซิร์ฟเวอร์?</li>
+      </ol>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

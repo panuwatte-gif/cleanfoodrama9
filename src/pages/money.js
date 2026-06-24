@@ -9,7 +9,8 @@ import { pi } from "../components/icons.js";
 import { hdr, note, tag, emptyState } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { fmt } from "../utils/formulas.js";
-import { MONEY, TODAY } from "../data/seed.js";
+import { TODAY } from "../data/seed.js";
+import { incomeRows, expenseRows } from "../data/store.js";
 
 const bold = (t) => h("b", null, t);
 const mst = { sel: TODAY.d, ctx: null };
@@ -25,11 +26,19 @@ export function moneyScreen(ctx) {
 function paint(root) {
   const { go, back, role, shopCtx } = mst.ctx;
   const sel = mst.sel;
-  const day = MONEY.days[sel];
+  // รวมยอดจริงต่อวันจากที่บันทึก (income/expense) — ไม่มีข้อมูล = ว่างจริง
+  const agg = {};
+  for (const r of incomeRows()) { const d = r.day; (agg[d] || (agg[d] = { in: 0, ex: 0 })).in += (r.net != null ? r.net : (r.gross || 0)); }
+  for (const r of expenseRows()) { const d = r.day; (agg[d] || (agg[d] = { in: 0, ex: 0 })).ex += (r.amount || 0); }
+  const monthIn = Object.values(agg).reduce((s, x) => s + x.in, 0);
+  const monthEx = Object.values(agg).reduce((s, x) => s + x.ex, 0);
+  const net = monthIn - monthEx;
+  const hasMonth = monthIn > 0 || monthEx > 0;
+  const day = agg[sel];
 
   const calDays = [];
   for (let d = 1; d <= 30; d++) {
-    const m = MONEY.days[d];
+    const m = agg[d];
     const future = d > TODAY.d;
     const dots = h("span", { class: "cal-dots" },
       m && m.in > 0 && h("i", { class: "in", style: { background: "var(--primary)" } }),
@@ -42,23 +51,25 @@ function paint(root) {
     }, h("span", null, String(d)), dots));
   }
 
-  const netCard = role === "owner"
-    ? h("div", { class: "card", style: { background: "radial-gradient(120% 140% at 100% 0%, rgba(22,163,74,0.10) 0%, transparent 55%), var(--surface)", borderColor: "var(--primary-soft)" } },
-        h("div", { class: "split" }, h("span", { class: "overline" }, "ยอดสุทธิเดือนนี้"), tag("กำไร", { kind: "ok" })),
-        h("div", { class: "big-num", style: { fontSize: "28px", color: "var(--primary-dark)", margin: "4px 0 10px" } }, "+ ฿" + fmt(MONEY.monthIncome - MONEY.monthExpense)),
-        h("div", { class: "rowflex", style: { gap: "10px" } },
-          h("div", { style: { flex: 1, textAlign: "center" } },
-            h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "รายได้รวม"),
-            h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--primary-dark)" } }, "฿" + fmt(MONEY.monthIncome)),
+  const netCard = role !== "owner"
+    ? note([bold("ยอดรวม/กำไรของเดือน"), " เห็นเฉพาะ", bold("เจ้าของ"), " — พนักงานบันทึกรายวันได้ตามปกติ"], { iconName: "lock" })
+    : hasMonth
+      ? h("div", { class: "card", style: { background: "radial-gradient(120% 140% at 100% 0%, rgba(22,163,74,0.10) 0%, transparent 55%), var(--surface)", borderColor: "var(--primary-soft)" } },
+          h("div", { class: "split" }, h("span", { class: "overline" }, "ยอดสุทธิเดือนนี้"), tag(net >= 0 ? "กำไร" : "ขาดทุน", { kind: net >= 0 ? "ok" : "dgr" })),
+          h("div", { class: "big-num", style: { fontSize: "28px", color: net >= 0 ? "var(--primary-dark)" : "var(--danger)", margin: "4px 0 10px" } }, (net >= 0 ? "+ ฿" : "− ฿") + fmt(Math.abs(net))),
+          h("div", { class: "rowflex", style: { gap: "10px" } },
+            h("div", { style: { flex: 1, textAlign: "center" } },
+              h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "รายได้รวม"),
+              h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--primary-dark)" } }, "฿" + fmt(monthIn)),
+            ),
+            h("span", { class: "tnum", style: { color: "var(--faint)", fontSize: "16px" } }, "−"),
+            h("div", { style: { flex: 1, textAlign: "center" } },
+              h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ค่าใช้จ่ายรวม"),
+              h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--warning-ink)" } }, "฿" + fmt(monthEx)),
+            ),
           ),
-          h("span", { class: "tnum", style: { color: "var(--faint)", fontSize: "16px" } }, "−"),
-          h("div", { style: { flex: 1, textAlign: "center" } },
-            h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ค่าใช้จ่ายรวม"),
-            h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "16px", color: "var(--warning-ink)" } }, "฿" + fmt(MONEY.monthExpense)),
-          ),
-        ),
-      )
-    : note([bold("ยอดรวม/กำไรของเดือน"), " เห็นเฉพาะ", bold("เจ้าของ"), " — พนักงานบันทึกรายวันได้ตามปกติ"], { iconName: "lock" });
+        )
+      : note(["ยังไม่มีบันทึกรายรับ-จ่ายเดือนนี้ — แตะ ", bold("+ รายได้"), " / ", bold("+ ค่าใช้จ่าย"), " เพื่อเริ่ม"], { iconName: "wallet" });
 
   const dayDetail = day
     ? [

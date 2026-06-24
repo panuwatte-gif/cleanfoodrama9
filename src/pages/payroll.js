@@ -9,12 +9,12 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note } from "../components/components.js";
 import { fmt } from "../utils/formulas.js";
-import { PAYROLL } from "../data/seed.js";
+import { payrollRows, setPayroll } from "../data/store.js";
 import { logEdit } from "../data/editlog.js";
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
-const pst = { rows: PAYROLL.map((p) => ({ ...p })), ctx: null };
+const pst = { rows: [], ctx: null };
 
 function calc(r) {
   if (r.type === "daily") {
@@ -30,6 +30,8 @@ const grandOf = () => pst.rows.reduce((s, r) => s + calc(r).total, 0);
 
 export function payrollScreen(ctx) {
   pst.ctx = ctx;
+  // โหลดจากชั้นข้อมูลกลาง (persist + sync Supabase) — สำเนามาแก้ในที่
+  pst.rows = payrollRows().map((p) => ({ ...p }));
   const root = h("div", { class: "page-wrap", "data-screen-label": "payroll", style: { display: "flex", flexDirection: "column", flex: 1 } });
   root._refs = {};
   paint(root);
@@ -111,7 +113,7 @@ function paint(root) {
     ),
     h("div", { class: "foot" },
       grandFoot,
-      h("button", { type: "button", class: "btn btn-primary", onClick: () => { logEdit({ txt: "บันทึกค่าแรง " + pst.rows.length + " คน · ฿" + fmt(Math.round(grandOf())), by: ctx.role === "owner" ? "เจ้าของ" : "พนักงาน" }); ctx.toast("บันทึกค่าแรง " + pst.rows.length + " คน · ฿" + fmt(Math.round(grandOf())) + " แล้ว"); ctx.back(); } }, pi("check", 17), "บันทึก"),
+      h("button", { type: "button", class: "btn btn-primary", onClick: async () => { await setPayroll(pst.rows); logEdit({ txt: "บันทึกค่าแรง " + pst.rows.length + " คน · ฿" + fmt(Math.round(grandOf())), by: ctx.role === "owner" ? "เจ้าของ" : "พนักงาน" }); ctx.toast("บันทึกค่าแรง " + pst.rows.length + " คน · ฿" + fmt(Math.round(grandOf())) + " แล้ว"); ctx.back(); } }, pi("check", 17), "บันทึก"),
     ),
   );
 }

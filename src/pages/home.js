@@ -14,14 +14,14 @@ import { pi } from "../components/icons.js";
 import { mascot } from "../components/mascot.js";
 import { itemIc } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
-import { branchCombo } from "../components/charts.js";
+import { branchCombo, pieChart, barChart, lineChart } from "../components/charts.js";
 import { itemById, unitOf, fmt, stockOf } from "../utils/formulas.js";
 import { isPlaceholderName } from "../services/authService.js";
 import {
   actionCount, homeCardSummary, inboxFor, pendingReviewFor, overdueAssignedBy,
   nameOf, isNotice, isOverdue, isDueToday,
 } from "../utils/messages.js";
-import { STOCK_SEED, MONEY, TODAY, branchDailySales } from "../data/seed.js";
+import { TODAY } from "../data/seed.js";
 import { incomeRows, expenseRows, items as allItems } from "../data/store.js";
 
 const DOW_FULL = { "จ.": "จันทร์", "อ.": "อังคาร", "พ.": "พุธ", "พฤ.": "พฤหัสบดี", "ศ.": "ศุกร์", "ส.": "เสาร์", "อา.": "อาทิตย์" };
@@ -83,7 +83,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
       h("div", { class: "home-top-main" },
         h("span", { class: "home-logo" }, mascot(40, { spark: true })),
         h("div", { class: "home-top-tt" },
-          h("h1", null, "คลัง & การดำเนินงาน"),
+          h("h1", null, "CleanFoodRama9"),
           h("p", null, "จัดการสต๊อก · ออเดอร์ · ทีมงาน"),
         ),
       ),
@@ -242,9 +242,14 @@ function ownerSalesBlock(go, shopCtx) {
       h("div", { class: "sc-sub" }, sub),
     );
 
-  // การ์ดกราฟ (รีเฟรชเฉพาะการ์ดเมื่อสลับช่วง — ไม่รีทั้งหน้า)
+  // การ์ดกราฟ: โดนัทสัดส่วนช่องทาง + แท่งยอดขายรวมรายวัน + เส้นรายได้สะสม (สเกลแยกกัน)
+  const CH_COLORS = { "Grab": "#2FAE60", "Lineman": "#00B2A9", "Shopee": "#F2671F", "หน้าร้าน": "#3B82F6", "อื่นๆ": "#9CA3AF" };
   const chartCard = h("div", { class: "card sales-card" });
   let range = "month";
+  const secTitle = (t, sub) => h("div", { class: "chart-sec-head" },
+    h("span", { class: "chart-sec-tt" }, t),
+    sub && h("span", { class: "chart-sec-sub" }, sub));
+
   function paintChart() {
     const days = range === "week" ? series.slice(-7) : series;
     const sel = h("select", { class: "sales-range" },
@@ -253,26 +258,51 @@ function ownerSalesBlock(go, shopCtx) {
     );
     sel.value = range;
     sel.addEventListener("change", () => { range = sel.value; paintChart(); });
-    chartCard.replaceChildren(
-      h("div", { class: "sales-head" },
-        h("span", { class: "sales-title" }, "ยอดขายรายวัน · ยอดขาย + สะสม"),
-        sel,
+
+    if (!series.length) {
+      chartCard.replaceChildren(
+        h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "ภาพรวมยอดขายทุกร้าน"), sel),
+        h("div", { style: { padding: "30px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
+          "ยังไม่มีข้อมูลยอดขาย", h("br"), "เริ่มที่ ", h("b", null, "บันทึกรายได้"), " แล้วกราฟจะขึ้นจริง"),
+        h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
+          pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
+      );
+      return;
+    }
+
+    // โดนัท: สัดส่วนรายได้ตามช่องทาง (ทั้งหมด ไม่ขึ้นกับช่วง)
+    const chMap = {};
+    for (const r of inc) { const k = r.ch || "อื่นๆ"; chMap[k] = (chMap[k] || 0) + (r.gross || 0); }
+    const segs = Object.keys(chMap).map((k) => ({ label: k, value: chMap[k], color: CH_COLORS[k] || "#9CA3AF" }))
+      .sort((a, b) => b.value - a.value);
+    const grossAll = segs.reduce((s, x) => s + x.value, 0) || 1;
+    const pieRow = h("div", { class: "pie-row" },
+      pieChart(segs, { size: 128, thickness: 25 }),
+      h("div", { class: "pie-legend" },
+        segs.map((s) => h("div", { class: "pie-leg-item" },
+          h("span", { class: "pie-dot", style: { background: s.color } }),
+          h("span", { class: "pie-leg-name" }, s.label),
+          h("span", { class: "pie-leg-pct tnum" }, Math.round(s.value / grossAll * 100) + "%"),
+          h("span", { class: "pie-leg-val tnum" }, "฿" + fmt(s.value)),
+        )),
       ),
-      days.length
-        ? branchCombo({ days, branches, h: 168, fmt })
-        : h("div", { style: { padding: "26px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
-            "ยังไม่มีข้อมูลยอดขาย", h("br"), "เริ่มที่ ", h("b", null, "บันทึกรายได้"), " แล้วกราฟจะขึ้นจริง"),
-      names.length > 1
-        ? h("div", { class: "sales-branches" },
-            todayChips.map((b) => h("div", { class: "sb-chip" },
-              h("span", { class: "sb-top" },
-                h("span", { class: "sb-dot", style: { background: b.color } }),
-                h("span", { class: "sb-name" }, b.name),
-              ),
-              h("span", { class: "sb-val tnum" }, "฿" + fmt(b.today)),
-            )),
-          )
-        : h("span", { style: { display: "none" } }),
+    );
+
+    // แท่ง: ยอดขายรวมรายวัน (ทุกร้าน) · สเกลของตัวเอง
+    const barData = days.map((d) => ({ label: String(d.d), v: d.total }));
+    // เส้น: รายได้สะสม (ทุกร้าน) · สเกลของตัวเอง
+    let acc = 0; const lineData = days.map((d) => ({ label: String(d.d), v: (acc += d.total) }));
+
+    chartCard.replaceChildren(
+      h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "ภาพรวมยอดขายทุกร้าน"), sel),
+      secTitle("สัดส่วนรายได้ตามช่องทาง", "ทั้งหมด"),
+      pieRow,
+      h("div", { class: "chart-divider" }),
+      secTitle("ยอดขายรวมรายวัน", "ทุกร้าน · บาท"),
+      h("div", { class: "chart-box" }, barChart(barData, { h: 116, color: "#54AE7B" })),
+      h("div", { class: "chart-divider" }),
+      secTitle("รายได้สะสม", "ทุกร้าน · บาท"),
+      h("div", { class: "chart-box" }, lineChart(lineData, { color: "#3B82F6", h: 96 })),
       h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
         pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
     );

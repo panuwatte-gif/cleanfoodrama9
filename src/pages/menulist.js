@@ -1,94 +1,61 @@
 // ============================================================
-// pages/menulist.js — เมนู · ราคาขาย
-//   เจ้าของ: เพิ่ม/แก้/ลบ เมนูได้ (ชื่อ/กลุ่ม/หน่วย/ต้นทุน/ราคา/ส่วนลด/รูป)
-//   *** เพิ่มเมนู = สร้าง "รายการ" ในข้อมูลกลาง + "เมนู" (ราคา) ผูกกัน ***
-//   → จานเดียวโผล่ทุกหน้า (เมนู · ข้อมูลกลาง · นับสต๊อก) + รูปลิงก์กันด้วย id
-//   บังคับแค่ ชื่อ + ราคา (ที่เหลือใส่ทีหลังได้ — ต้นทุนไม่ต้องครบ)
+// pages/menulist.js — เมนู · ราคาขาย  (ตารางเดี่ยว standalone — จดโปรกันลืม)
+//   • ไม่ลิงก์สต๊อก/ข้อมูลกลาง (การลิงก์เดิมทำชื่อไม่ตรงแล้วพัง — ตัดทิ้ง)
+//   • คอลัมน์: กับข้าว | ชนิดข้าว | ราคาตั้งขาย | ส่วนลด | ราคาสุทธิ (=ตั้งขาย−ส่วนลด)
+//   • 1 แถว = 1 รายการขาย (กับข้าวเดียวกันคนละชนิดข้าว = คนละแถว)
+//   • เก็บลง Supabase ตาราง rama9_price_list (ไม่มี foreign key)
 // ctx = { go, back, role, toast }
 // ============================================================
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { hdr, note, searchBox, itemIc, iconPicker, emptyState } from "../components/components.js";
-import { sheet, pinSheetBody } from "../components/sheet.js";
-import { menus, saveMenu, removeMenu, saveItem, items } from "../data/store.js";
-import { fmt, itemById, sortMenus } from "../utils/formulas.js";
+import { hdr, note, searchBox, emptyState } from "../components/components.js";
+import { sheet } from "../components/sheet.js";
+import { priceRows, savePrice, removePrice } from "../data/store.js";
+import { fmt } from "../utils/formulas.js";
 
 const bold = (t) => h("b", null, t);
-const mst = { q: "", ctx: null, edit: null, pin: null, pick: false, pickQ: "" };
-const field = (label, input) =>
-  h("label", { class: "stack", style: { gap: "5px" } }, h("span", { class: "field-label" }, label), input);
+const pst = { q: "", ctx: null, edit: null };
+const netOf = (r) => Math.max(0, (Number(r.price) || 0) - (Number(r.disc) || 0));
+const field = (label, input, hint) =>
+  h("label", { class: "stack", style: { gap: "5px" } }, h("span", { class: "field-label" }, label), input,
+    hint ? h("span", { style: { fontSize: "11px", color: "var(--faint)" } }, hint) : null);
 
-// กลุ่มเมนู → ผูกกับหมวด/หมวดย่อยจริงในข้อมูลกลาง (+ หน่วยเริ่มต้น)
-const MENU_GROUPS = [
-  { key: "beef",    cat: "protein", sub: "beef",    unit: "kg",  name: "เนื้อ" },
-  { key: "pork",    cat: "protein", sub: "pork",    unit: "kg",  name: "หมู" },
-  { key: "chicken", cat: "protein", sub: "chicken", unit: "kg",  name: "ไก่" },
-  { key: "duck",    cat: "protein", sub: "duck",    unit: "kg",  name: "เป็ด" },
-  { key: "fish",    cat: "protein", sub: "fish",    unit: "kg",  name: "ปลา" },
-  { key: "shrimp",  cat: "protein", sub: "shrimp",  unit: "kg",  name: "กุ้ง" },
-  { key: "egg",     cat: "egg",     sub: null,      unit: "ฟอง", name: "ไข่ / ของเพิ่ม" },
-  { key: "drink",   cat: "drink",   sub: "zero",    unit: "ขวด", name: "เครื่องดื่ม" },
-  { key: "other",   cat: "dry",     sub: null,      unit: "",    name: "อื่นๆ" },
-];
-const groupOf = (it) => {
-  if (!it) return "other";
-  const g = MENU_GROUPS.find((x) => x.cat === it.cat && (x.sub || null) === (it.sub || null))
-        || MENU_GROUPS.find((x) => x.cat === it.cat);
-  return g ? g.key : "other";
-};
-const groupName = (it) => { const g = MENU_GROUPS.find((x) => x.key === groupOf(it)); return g ? g.name : "อื่นๆ"; };
-
-// ของกินที่ "ขายได้" และยังไม่ได้เป็นเมนู → เอามาเลือกตั้งเป็นเมนู (กันพิมพ์ซ้ำ)
-const FOOD_CATS = ["protein", "egg", "drink"];
-const GORDER = MENU_GROUPS.map((g) => g.key);
-function availableItems() {
-  const used = new Set(menus().map((m) => m.item).filter(Boolean));
-  return items()
-    .filter((it) => it.isActive !== false && FOOD_CATS.includes(it.cat) && !used.has(it.id))
-    .sort((a, b) => {
-      const ga = GORDER.indexOf(groupOf(a)), gb = GORDER.indexOf(groupOf(b));
-      return ga !== gb ? ga - gb : (a.name || "").localeCompare(b.name || "", "th");
-    });
-}
-
-// รูปเมนู: รูปอัปเอง (icon-<item|id>) ก่อน → ไอคอน item ที่ผูก → ไอคอนสำรอง
-function menuIcon(m) {
-  const key = "icon-" + (m.item || m.id);
-  const photo = window.kkSlots ? window.kkSlots.get(key) : null;
-  if (photo) return h("span", { class: "catic photo" }, h("img", { src: photo, alt: "" }));
-  if (m.item) return itemIc(m.item, { sm: false });
-  return h("span", { class: "catic green" }, pi(m.icon || "tag", 18));
-}
+// เรียง: ตามชื่อกับข้าว แล้วชนิดข้าว (อ่านง่าย จัดกลุ่มจานเดียวกันติดกัน)
+const sorted = (rows) => [...rows].sort((a, b) =>
+  (a.dish || "").localeCompare(b.dish || "", "th") || (a.rice || "").localeCompare(b.rice || "", "th"));
 
 function priceCell(lbl, val, col, strike) {
-  return h("div", { style: { textAlign: "right", minWidth: "56px" } },
+  return h("div", { style: { textAlign: "right", minWidth: "52px" } },
     h("div", { style: { fontSize: "10px", color: "var(--faint)" } }, lbl),
-    h("div", { class: "tnum", style: { fontSize: "14px", fontWeight: 700, color: col || "var(--text)", textDecoration: strike ? "line-through" : "none" } }, val),
+    h("div", { class: "tnum", style: { fontSize: "13.5px", fontWeight: 700, color: col || "var(--text)", textDecoration: strike ? "line-through" : "none" } }, val),
   );
 }
 
-function menuRow(m, root) {
-  const owner = mst.ctx.role === "owner";
-  const net = (m.price || 0) - (m.disc || 0);
-  return h("div", { class: "card split", style: { padding: "11px 14px", cursor: owner ? "pointer" : "default" }, onClick: owner ? () => openEdit(m, root) : undefined },
-    h("div", { class: "rowflex", style: { minWidth: 0, flex: 1 } },
-      menuIcon(m),
+function priceRow(r, root) {
+  const owner = pst.ctx.role === "owner";
+  const disc = Number(r.disc) || 0;
+  return h("div", { class: "card split", style: { padding: "11px 14px", cursor: owner ? "pointer" : "default" }, onClick: owner ? () => openEdit(r, root) : undefined },
+    h("div", { class: "rowflex", style: { minWidth: 0, flex: 1, gap: "10px" } },
+      h("span", { class: "catic green", style: { flex: "none" } }, pi("tag", 17)),
       h("div", { style: { minWidth: 0 } },
-        h("div", { style: { fontWeight: 700, fontSize: "14px" } }, m.name),
-        m.disc ? h("div", { style: { fontSize: "11px", color: "var(--muted)" } }, "ส่วนลด " + fmt(m.disc) + " ฿") : null,
+        h("div", { style: { fontWeight: 700, fontSize: "14px" } }, r.dish || "—"),
+        r.rice
+          ? h("div", { class: "rowflex", style: { gap: "4px", fontSize: "11px", color: "var(--primary-dark)", fontWeight: 600, marginTop: "1px" } }, pi("rice", 11), r.rice)
+          : h("div", { style: { fontSize: "11px", color: "var(--faint)" } }, "ไม่ระบุชนิดข้าว"),
       ),
     ),
-    h("div", { class: "rowflex", style: { gap: "10px", flex: "none" } },
-      m.disc ? priceCell("ราคา", fmt(m.price), "var(--muted)", true) : null,
-      priceCell("สุทธิ", fmt(net) + " ฿", "var(--primary-dark)"),
-      owner ? h("span", { class: "catic", style: { background: "transparent" } }, pi("edit", 15)) : null,
+    h("div", { class: "rowflex", style: { gap: "9px", flex: "none" } },
+      disc ? priceCell("ตั้งขาย", fmt(r.price || 0), "var(--muted)", true) : priceCell("ตั้งขาย", fmt(r.price || 0), "var(--muted)"),
+      disc ? priceCell("ส่วนลด", "−" + fmt(disc), "var(--warning-ink)") : null,
+      priceCell("สุทธิ", fmt(netOf(r)) + " ฿", "var(--primary-dark)"),
+      owner ? h("span", { class: "catic", style: { background: "transparent", flex: "none" } }, pi("edit", 15)) : null,
     ),
   );
 }
 
 export function menuListScreen(ctx) {
-  mst.ctx = ctx; mst.q = ""; mst.edit = null; mst.pin = null;
+  pst.ctx = ctx; pst.q = ""; pst.edit = null;
   const root = h("div", { class: "page-wrap", "data-screen-label": "menulist" });
   root._sheets = h("div");
   paint(root);
@@ -96,187 +63,115 @@ export function menuListScreen(ctx) {
 }
 
 function paint(root) {
-  const { back, role } = mst.ctx;
+  const { back, role } = pst.ctx;
   const owner = role === "owner";
-  const q = mst.q.toLowerCase();
-  const list = sortMenus(menus()).filter((m) => !q || (m.name || "").toLowerCase().includes(q));
-  const searchEl = searchBox({ value: mst.q, onChange: (v) => { mst.q = v; paint(root); }, placeholder: "ค้นหาเมนู…" });
+  const q = pst.q.toLowerCase();
+  const rows = sorted(priceRows()).filter((r) => !q || (r.dish || "").toLowerCase().includes(q) || (r.rice || "").toLowerCase().includes(q));
+  const searchEl = searchBox({ value: pst.q, onChange: (v) => { pst.q = v; paint(root); }, placeholder: "ค้นหากับข้าว / ชนิดข้าว…" });
+  const total = priceRows().length;
 
   root.replaceChildren(
-    hdr({ title: "เมนู · ราคาขาย", sub: menus().length + " เมนู · ราคาขาย − ส่วนลด = ราคาสุทธิ", onBack: back, right: h("span", { class: "catic green" }, pi("tag", 18)) }),
+    hdr({ title: "เมนู · ราคาขาย", sub: total + " รายการ · ตั้งขาย − ส่วนลด = สุทธิ", onBack: back, right: h("span", { class: "catic green" }, pi("tag", 18)) }),
     h("div", { class: "page stack" },
       owner
-        ? note(["แตะเมนูเพื่อแก้ · กด", bold("เพิ่มเมนูใหม่"), "ด้านล่าง — เพิ่มแล้วจะไปโผล่ที่", bold("ข้อมูลกลาง"), "และนับสต๊อกได้ด้วย (เชื่อมกันด้วยรูป/ชื่อเดียวกัน)"], { iconName: "tag" })
-        : note(["ราคาขาย − ส่วนลด = ", bold("ราคาสุทธิ"), " · แก้ไขทำที่ฝั่ง", bold("เจ้าของ")], { iconName: "tag" }),
+        ? note(["จดราคาขาย", bold("กันลืมโปร"), " — กับข้าวเดียวกันคนละชนิดข้าวก็แยกเป็นคนละแถวได้ · แตะแถวเพื่อแก้"], { iconName: "tag" })
+        : note(["ราคาตั้งขาย − ส่วนลด = ", bold("ราคาสุทธิ"), " · แก้ไขทำที่ฝั่ง", bold("เจ้าของ")], { iconName: "tag" }),
       searchEl,
-      list.length
-        ? h("div", { class: "stack" }, list.map((m) => menuRow(m, root)))
-        : emptyState({ compact: true, iconName: "search", title: mst.q ? 'ไม่พบ "' + mst.q + '"' : "ยังไม่มีเมนู", sub: owner ? "กดเพิ่มเมนูใหม่ด้านล่าง" : "ลองคำอื่น" }),
-      owner && h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => openAdd(root) }, pi("plus", 16), "เพิ่มเมนูใหม่"),
+      rows.length
+        ? h("div", { class: "stack" },
+            h("div", { class: "rowflex", style: { padding: "0 14px", fontSize: "10.5px", color: "var(--faint)", fontWeight: 700, letterSpacing: ".3px" } },
+              h("span", { style: { flex: 1 } }, "กับข้าว · ชนิดข้าว"),
+              h("span", null, "ตั้งขาย · ส่วนลด · สุทธิ")),
+            ...rows.map((r) => priceRow(r, root)))
+        : emptyState({ compact: true, iconName: q ? "search" : "tag", title: q ? 'ไม่พบ "' + pst.q + '"' : "ยังไม่มีรายการราคา", sub: owner ? "กดเพิ่มรายการด้านล่าง" : "ยังไม่มีข้อมูล" }),
+      owner && h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => openAdd(root) }, pi("plus", 16), "เพิ่มรายการขาย"),
     ),
     root._sheets,
   );
 
   renderSheets(root);
-  if (mst.q) { const inp = searchEl.querySelector("input"); if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n, n); } }
+  if (pst.q) { const inp = searchEl.querySelector("input"); if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n, n); } }
 }
 
-/* ---------- เพิ่ม/แก้/ลบ ---------- */
-function openAdd(root) { mst.pick = true; mst.pickQ = ""; renderSheets(root); }
-function createNew(root) {
-  mst.pick = false;
-  const itemId = "new-" + Date.now();
-  mst.edit = { new: true, id: "mn-" + Date.now(), itemId, name: "", group: "other", unit: "", cost: "", price: "", disc: "", icon: "tag" };
+/* ---------- เพิ่ม / แก้ / ลบ ---------- */
+function openAdd(root) {
+  pst.edit = { new: true, id: "pl-" + Date.now(), dish: "", rice: "", price: "", disc: "" };
   renderSheets(root);
 }
-function pickItem(it, root) {
-  mst.pick = false;
-  mst.edit = {
-    new: true, id: "mn-" + Date.now(), itemId: it.id, item: it.id,
-    name: it.name, group: groupOf(it), unit: it.unit || "",
-    cost: it.cost != null ? String(it.cost) : "", price: "", disc: "", icon: it.icon || "tag",
-  };
-  renderSheets(root);
-}
-function pickRow(it, root) {
-  return h("button", { type: "button", class: "card split", style: { padding: "9px 12px", width: "100%", cursor: "pointer", textAlign: "left" }, onClick: () => pickItem(it, root) },
-    h("div", { class: "rowflex", style: { minWidth: 0, flex: 1, gap: "9px" } },
-      itemIc(it, { sm: false }),
-      h("div", { style: { minWidth: 0 } },
-        h("div", { style: { fontWeight: 700, fontSize: "13.5px" } }, it.name),
-        h("div", { style: { fontSize: "11px", color: "var(--muted)" } }, groupName(it) + (it.cost != null ? " · ต้นทุน " + fmt(it.cost) + " ฿" : "")),
-      ),
-    ),
-    pi("chev", 14),
-  );
-}
-function pickBody(root) {
-  const q = (mst.pickQ || "").toLowerCase();
-  const all = availableItems();
-  const list = all.filter((it) => !q || (it.name || "").toLowerCase().includes(q));
-  const searchEl = searchBox({ value: mst.pickQ || "", onChange: (v) => { mst.pickQ = v; renderSheets(root); }, placeholder: "ค้นหาของกินในข้อมูลกลาง…" });
-  if (mst.pickQ) setTimeout(() => { const inp = searchEl.querySelector("input"); if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n, n); } }, 0);
-  return h("div", { class: "stack", style: { gap: "10px" } },
-    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 2px" } }, "เลือกเมนูจากข้อมูลกลาง"),
-    h("div", { style: { fontSize: "11.5px", color: "var(--muted)", textAlign: "center", marginBottom: "2px" } }, "แตะของที่จะตั้งขาย — ไม่ต้องพิมพ์เอง กันชื่อซ้ำ"),
-    searchEl,
-    all.length
-      ? (list.length
-          ? h("div", { class: "stack", style: { gap: "6px", maxHeight: "44vh", overflowY: "auto" } }, list.map((it) => pickRow(it, root)))
-          : h("div", { style: { textAlign: "center", color: "var(--muted)", fontSize: "12.5px", padding: "14px" } }, 'ไม่พบ "' + mst.pickQ + '"'))
-      : h("div", { style: { textAlign: "center", color: "var(--muted)", fontSize: "12.5px", padding: "14px" } }, "ของกินในข้อมูลกลางถูกตั้งเป็นเมนูครบแล้ว"),
-    h("button", { type: "button", class: "btn btn-block", onClick: () => createNew(root) }, pi("plus", 15), "สร้างของใหม่ (ไม่มีในข้อมูลกลาง)"),
-  );
-}
-function openEdit(m, root) {
-  const it = m.item ? itemById(m.item) : null;
-  const itemId = m.item || m.id;   // เมนูเก่าที่ยังไม่มี item → ใช้ id เมนูเป็น id รายการ (เซฟแล้วจะสร้างให้)
-  mst.edit = {
-    id: m.id, itemId, item: m.item,
-    name: m.name || (it && it.name) || "",
-    group: groupOf(it),
-    unit: (it && it.unit) || "",
-    cost: it && it.cost != null ? String(it.cost) : "",
-    price: m.price != null ? String(m.price) : "",
-    disc: m.disc ? String(m.disc) : "",
-    icon: (it && it.icon) || m.icon || "tag",
-  };
+function openEdit(r, root) {
+  pst.edit = { id: r.id, dish: r.dish || "", rice: r.rice || "", price: r.price != null ? String(r.price) : "", disc: r.disc ? String(r.disc) : "" };
   renderSheets(root);
 }
 
-function askDelete(root) {
-  const e = mst.edit;
-  mst.edit = null;
-  mst.pin = {
-    title: "ยืนยันลบเมนู",
-    sub: 'ลบ "' + (e.name || "") + '" · ใส่รหัสเพื่อยืนยัน',
-    onOk: async () => { await removeMenu(e.id); mst.pin = null; paint(root); mst.ctx.toast("ลบเมนูแล้ว"); },
-  };
-  renderSheets(root);
-}
-
-async function saveMenuEdit(root) {
-  const e = mst.edit;
-  const g = MENU_GROUPS.find((x) => x.key === e.group) || MENU_GROUPS[MENU_GROUPS.length - 1];
-  const name = (e.name || "").trim();
+async function doSave(root) {
+  const e = pst.edit;
+  const dish = (e.dish || "").trim();
   const price = Math.max(0, parseFloat(e.price) || 0);
-  const disc = Math.max(0, parseFloat(e.disc) || 0);
-  const unit = (e.unit || g.unit || "").trim();
-  const hasCost = !(e.cost === "" || e.cost == null);
-
-  // 1) รายการในข้อมูลกลาง (เชื่อมทุกหน้า + นับสต๊อกได้) — ต้นทุนใส่เฉพาะถ้ามี
-  const itemRec = { id: e.itemId, cat: g.cat, sub: g.sub || undefined, name, unit, icon: e.icon || "tag", isActive: true };
-  if (hasCost) itemRec.cost = Math.max(0, parseFloat(e.cost) || 0);
-  await saveItem(itemRec);
-
-  // 2) เมนู (ราคา) ชี้มาที่รายการเดียวกัน
-  await saveMenu({ id: e.id, item: e.itemId, name, price, disc, icon: e.icon || "tag" });
-
+  if (!dish || !(price > 0)) return;
+  await savePrice({
+    id: e.id,
+    dish,
+    rice: (e.rice || "").trim(),
+    price,
+    disc: Math.max(0, parseFloat(e.disc) || 0),
+    at: new Date().toISOString(),
+  });
   const isNew = e.new;
-  mst.edit = null;
-  paint(root);
-  mst.ctx.toast(isNew ? "เพิ่มเมนูแล้ว — เชื่อมข้อมูลกลางให้ด้วย" : "บันทึกแล้ว");
+  pst.edit = null; paint(root);
+  pst.ctx.toast(isNew ? "เพิ่มรายการขายแล้ว" : "บันทึกแล้ว");
+}
+
+async function doDelete(root) {
+  const e = pst.edit;
+  await removePrice(e.id);
+  pst.edit = null; paint(root);
+  pst.ctx.toast("ลบรายการแล้ว");
 }
 
 function editBody(root) {
-  const e = mst.edit;
-  const slotId = "icon-" + e.itemId;
-  const picker = iconPicker({ value: e.icon, tint: "green", slotId, onChange: (n) => { mst.edit.icon = n; } });
-
-  const nameIn = h("input", { type: "text", class: "input", value: e.name || "", placeholder: "เช่น หมูกระเทียม + ข้าว" });
-  const unitIn = h("input", { type: "text", class: "input", value: e.unit || "", placeholder: "kg / ฟอง / ขวด (ไม่ใส่ก็ได้)" });
-  const costIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.cost || "", placeholder: "ไม่ทราบ = เว้นว่าง" });
+  const e = pst.edit;
+  const dishIn = h("input", { type: "text", class: "input", value: e.dish || "", placeholder: "เช่น กะเพราไก่ / หมูกระเทียม" });
+  const riceIn = h("input", { type: "text", class: "input", value: e.rice || "", placeholder: "เช่น หอมมะลิ / ไรซ์เบอร์รี่ (เว้นว่างได้)" });
   const priceIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.price !== "" && e.price != null ? String(e.price) : "", placeholder: "0" });
   const discIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.disc ? String(e.disc) : "", placeholder: "0" });
 
-  const groupSel = h("select", { class: "input" },
-    MENU_GROUPS.map((gr) => h("option", { value: gr.key }, gr.name)));
-  groupSel.value = e.group || "other";
-  groupSel.addEventListener("change", () => {
-    mst.edit.group = groupSel.value;
-    const gr = MENU_GROUPS.find((x) => x.key === groupSel.value);
-    if (gr && !(unitIn.value && unitIn.value.trim())) { unitIn.value = gr.unit || ""; mst.edit.unit = unitIn.value; }
-  });
+  const netBig = h("div", { class: "big-num tnum", style: { fontSize: "24px", color: "var(--primary-dark)" } }, "฿0");
+  const recalc = () => {
+    const p = Math.max(0, parseFloat(priceIn.value) || 0);
+    const d = Math.max(0, parseFloat(discIn.value) || 0);
+    netBig.textContent = "฿" + fmt(Math.max(0, p - d));
+  };
 
-  const valid = () => !!(mst.edit.name && String(mst.edit.name).trim()) && parseFloat(priceIn.value) > 0;
-  const saveBtn = h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => { if (valid()) saveMenuEdit(root); } }, pi("check", 16), "บันทึก");
+  const valid = () => !!(dishIn.value && dishIn.value.trim()) && parseFloat(priceIn.value) > 0;
+  const saveBtn = h("button", { type: "button", class: "btn btn-primary btn-block", onClick: () => { if (valid()) doSave(root); } }, pi("check", 16), "บันทึก");
   const syncBtn = () => { const ok = valid(); saveBtn.disabled = !ok; saveBtn.style.opacity = ok ? 1 : 0.45; };
-  nameIn.addEventListener("input", () => { mst.edit.name = nameIn.value; syncBtn(); });
-  priceIn.addEventListener("input", () => { mst.edit.price = priceIn.value; syncBtn(); });
-  discIn.addEventListener("input", () => { mst.edit.disc = discIn.value; });
-  costIn.addEventListener("input", () => { mst.edit.cost = costIn.value; });
-  unitIn.addEventListener("input", () => { mst.edit.unit = unitIn.value; });
-  syncBtn();
+
+  dishIn.addEventListener("input", () => { pst.edit.dish = dishIn.value; syncBtn(); });
+  riceIn.addEventListener("input", () => { pst.edit.rice = riceIn.value; });
+  priceIn.addEventListener("input", () => { pst.edit.price = priceIn.value; recalc(); syncBtn(); });
+  discIn.addEventListener("input", () => { pst.edit.disc = discIn.value; recalc(); });
+  recalc(); syncBtn();
 
   return h("div", { class: "stack", style: { gap: "12px" } },
-    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 4px" } }, e.new ? "เพิ่มเมนูใหม่" : "แก้ไขเมนู"),
-    h("div", { style: { fontSize: "11.5px", color: "var(--muted)", textAlign: "center", marginBottom: "4px" } }, "กรอกแค่ชื่อ + ราคา ก็บันทึกได้ · ที่เหลือใส่ทีหลังได้"),
-    field("ชื่อเมนู *", nameIn),
+    h("h2", { style: { font: "var(--h2)", textAlign: "center", margin: "6px 0 2px" } }, e.new ? "เพิ่มรายการขาย" : "แก้ไขรายการขาย"),
+    h("div", { style: { fontSize: "11.5px", color: "var(--muted)", textAlign: "center", marginBottom: "2px" } }, "กรอกกับข้าว + ราคาตั้งขาย ก็พอ — ชนิดข้าว/ส่วนลดใส่ถ้ามี"),
+    field("กับข้าว *", dishIn),
+    field("ชนิดข้าว", riceIn, "กับข้าวเดียวกันคนละชนิดข้าว = แยกเป็นคนละแถว"),
     h("div", { class: "rowflex", style: { gap: "10px", alignItems: "flex-end" } },
-      h("div", { style: { flex: 1.3 } }, field("กลุ่ม (ไว้จัดหมวด/นับสต๊อก)", groupSel)),
-      h("div", { style: { flex: 1 } }, field("หน่วย", unitIn)),
-    ),
-    h("div", null,
-      h("div", { class: "field-label", style: { marginBottom: "6px" } }, "รูป/ไอคอนของเมนู"),
-      picker,
-    ),
-    h("div", { class: "rowflex", style: { gap: "10px", alignItems: "flex-end" } },
-      h("div", { style: { flex: 1 } }, field("ราคาขาย (฿) *", priceIn)),
+      h("div", { style: { flex: 1 } }, field("ราคาตั้งขาย (฿) *", priceIn)),
       h("div", { style: { flex: 1 } }, field("ส่วนลด (฿)", discIn)),
-      h("div", { style: { flex: 1 } }, field("ต้นทุน (฿)", costIn)),
+    ),
+    h("div", { class: "card soft-card soft-green split" },
+      h("div", null, h("div", { class: "overline" }, "ราคาสุทธิ (คำนวณ)"), netBig),
+      h("span", { class: "catic fill", style: { width: "44px", height: "44px", borderRadius: "14px" } }, pi("tag", 20)),
     ),
     saveBtn,
-    !e.new && h("button", { type: "button", class: "btn btn-block", style: { color: "var(--danger)", borderColor: "var(--danger)" }, onClick: () => askDelete(root) }, pi("trash", 15), "ลบเมนูนี้"),
+    !e.new && h("button", { type: "button", class: "btn btn-block", style: { color: "var(--danger)", borderColor: "var(--danger)" }, onClick: () => doDelete(root) }, pi("trash", 15), "ลบรายการนี้"),
   );
 }
 
 function renderSheets(root) {
   const layer = root._sheets;
   layer.replaceChildren();
-  if (mst.pick) layer.appendChild(sheet({ onClose: () => { mst.pick = false; mst.pickQ = ""; renderSheets(root); }, children: pickBody(root) }));
-  if (mst.edit) layer.appendChild(sheet({ onClose: () => { mst.edit = null; renderSheets(root); }, children: editBody(root) }));
-  if (mst.pin) layer.appendChild(sheet({
-    onClose: () => { mst.pin = null; renderSheets(root); },
-    children: pinSheetBody({ title: mst.pin.title, sub: mst.pin.sub, onOk: mst.pin.onOk, onCancel: () => { mst.pin = null; renderSheets(root); } }),
-  }));
+  if (pst.edit) layer.appendChild(sheet({ onClose: () => { pst.edit = null; renderSheets(root); }, children: editBody(root) }));
 }

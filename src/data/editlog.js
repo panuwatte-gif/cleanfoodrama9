@@ -10,7 +10,6 @@
 // ============================================================
 
 import { load, save } from "../utils/storage.js";
-import { AUDIT } from "./seed.js";
 
 const LK = "editlog:v1";
 const MONTHS_TH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -25,13 +24,26 @@ let log = null;
 function init() {
   if (log) return log;
   const saved = load(LK, null);
-  log = (saved && Array.isArray(saved)) ? saved
-    : AUDIT.map((a, i) => ({ id: "seed-" + i, txt: a.txt, by: a.by, t: a.t, kind: a.kind }));
+  // เริ่มว่างจริง (audit trail เริ่มนับจากการใช้งานจริง) — ไม่ seed ตัวอย่าง
+  log = (saved && Array.isArray(saved)) ? saved : [];
   return log;
 }
 
 // getEditLogs() → array (ใหม่สุดบน) — สำเนา กันแก้ภายนอก
 export function getEditLogs() { return init().slice(); }
+
+// เวลาโดยประมาณจาก id (el-<ts>-xxx) เพื่อจัดเรียงใหม่สุดบน · seed = 0 (ล่างสุด)
+function tsOf(e) { const m = /^el-(\d+)/.exec(e && e.id || ""); return m ? Number(m[1]) : 0; }
+
+// adoptEditLogs(rows) — รับ log จากคลาวด์ (rama9_edit_logs) มารวมกับของในเครื่อง
+// dedupe ตาม id · เรียงใหม่สุดบน · บันทึกกลับ localStorage (audit ลบไม่ได้ จึง union)
+export function adoptEditLogs(rows) {
+  if (!Array.isArray(rows)) return;
+  const byId = new Map(init().map((e) => [e.id, e]));
+  for (const r of rows) if (r && r.id && !byId.has(r.id)) byId.set(r.id, r);
+  log = Array.from(byId.values()).sort((a, b) => tsOf(b) - tsOf(a));
+  save(LK, log);
+}
 
 // logEdit({ txt, kind, by }) — by = ชื่อผู้แก้ (เช่น "เจ้าของ" / "พนักงาน")
 // kind: 'edit' | 'add' | 'del'  (ใช้เลือกไอคอน/สีในหน้า history)
@@ -40,5 +52,8 @@ export function logEdit({ txt, kind = "edit", by = "เจ้าของ" } = {
   const l = init();
   l.unshift({ id: "el-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), txt, by: "รหัส: " + by, t: stamp(), kind });
   save(LK, l);
+  // push audit up to the cloud (rama9_edit_logs). late import → no static cycle
+  // with backend.js (which statically imports getEditLogs/adoptEditLogs here).
+  import("./backend.js").then((m) => m.scheduleSync && m.scheduleSync()).catch(() => {});
   return l[0];
 }

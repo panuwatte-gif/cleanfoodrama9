@@ -9,8 +9,8 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { seg, searchBox, note, menuTabs, hdr } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
-import { entryList, entryFoot, confirmSheet } from "./_entry.js";
-import { cats, items as allItems, saveItem } from "../data/store.js";
+import { entryList, entryFoot, confirmSheet, isFilled, sumOf } from "./_entry.js";
+import { cats, items as allItems, saveItem, applyCount } from "../data/store.js";
 import { catById } from "../utils/formulas.js";
 import { TODAY } from "../data/seed.js";
 import { load, save } from "../utils/storage.js";
@@ -138,7 +138,16 @@ function renderSheets(root) {
       title: "ยืนยันการนับ?",
       dupNote: ['ระบบเช็คให้: วันนี้ยังไม่เคยบันทึก "นับสินค้าคงเหลือ" — ', bold("ไม่ซ้ำ"), " · ถัดไปมีขั้นแยกทิ้ง/เสีย"],
       onClose: () => { st.confirm = false; renderSheets(root); },
-      onSave: () => { st.confirm = false; st.ctx.go({ name: "waste", replace: true }); },
+      onSave: async () => {
+        st.confirm = false; renderSheets(root);
+        // บันทึกตรวจนับ → ตั้งคงเหลือจริง (persist + sync Supabase)
+        const lines = allItems().filter((it) => isFilled(st.vals, it))
+          .map((it) => ({ id: it.id, qty: Number(sumOf(st.vals, it)) }))
+          .filter((l) => !Number.isNaN(l.qty));
+        await applyCount(lines, st.ctx.user ? st.ctx.user.name : (st.ctx.role === "owner" ? "เจ้าของ" : "พนักงาน"));
+        st.vals = {}; save(DK, st.vals);
+        st.ctx.go({ name: "waste", replace: true });
+      },
     }));
   }
   if (st.addTo) {

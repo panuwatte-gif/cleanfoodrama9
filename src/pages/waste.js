@@ -9,6 +9,7 @@ import { pi } from "../components/icons.js";
 import { note, tag, itemIc, hdr, qtyInput } from "../components/components.js";
 import { itemById, unitOf, fmt } from "../utils/formulas.js";
 import { TODAY } from "../data/seed.js";
+import { applyWaste } from "../data/store.js";
 
 const WASTE_GONE = [
   { id: "kp-beef", gone: 2.3 },
@@ -103,7 +104,15 @@ function paint(root) {
         h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ทิ้งวันนี้"),
         footCount,
       ),
-      h("button", { type: "button", class: "btn btn-primary", onClick: () => { ctx.toast("บันทึกแล้ว · ไปหน้าส่งรายงานประจำวัน"); ctx.go({ name: "dailyreport", replace: true }); } }, pi("send", 16), "บันทึก → ส่งรายงาน"),
+      h("button", { type: "button", class: "btn btn-primary", onClick: async () => {
+        // หักของทิ้งออกจากสต๊อกจริง (FIFO · persist + sync Supabase)
+        const lines = Object.entries(st.waste)
+          .filter(([, v]) => Number(v) > 0)
+          .map(([id, v]) => ({ id, qty: Number(v), reason: st.reason[id] }));
+        await applyWaste(lines, ctx.user ? ctx.user.name : (ctx.role === "owner" ? "เจ้าของ" : "พนักงาน"));
+        ctx.toast(lines.length ? "บันทึกของทิ้ง " + lines.length + " รายการ · หักสต๊อกแล้ว" : "ไม่มีของทิ้ง · ไปส่งรายงาน");
+        ctx.go({ name: "dailyreport", replace: true });
+      } }, pi("send", 16), "บันทึก → ส่งรายงาน"),
     ),
   );
 }

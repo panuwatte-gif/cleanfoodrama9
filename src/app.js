@@ -175,7 +175,7 @@ function renderContent() {
       case "income":        return incomeScreen({ ...sctx, day: r.day });
       case "expense":       return expenseScreen({ ...sctx, day: r.day });
       case "forecast":      return forecastScreen(sctx);
-      case "fchistory":     return fcHistoryScreen(sctx);
+      case "fchistory":     return fcHistoryScreen({ ...sctx, id: r.id });
       case "tax":           return taxScreen(sctx);
       case "execsummary":   return execSummaryScreen(sctx);
       case "orderexpense":  return orderExpenseScreen(sctx);

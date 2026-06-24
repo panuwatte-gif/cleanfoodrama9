@@ -557,13 +557,13 @@ button { font-family: inherit; cursor: pointer; }
    v4 — home dashboard (จับคู่ภาพอ้างอิงที่อัพโหลด — illustrated)
 ==================================================================== */
 /* แถบบนหน้าหลัก (โลโก้กล่อง + ชื่อ + พิกัด + กระดิ่ง) — wrap ได้บนจอแคบ */
-.home-top { display: flex; align-items: center; gap: 10px; padding: 14px 16px 6px; flex-wrap: wrap; row-gap: 9px; }
-.home-top-main { display: flex; align-items: center; gap: 10px; flex: 1 1 100%; min-width: 0; }
-/* ปุ่ม + ชื่อร้าน อยู่บรรทัดล่างเสมอ → หัวข้อได้เต็มความกว้าง ไม่ถูกบีบทับ mascot */
-.home-top-actions { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; justify-content: flex-end; margin-left: 0; flex-wrap: wrap; }
+.home-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px 6px; flex-wrap: nowrap; }
+.home-top-main { display: flex; align-items: center; gap: 9px; flex: 1 1 auto; min-width: 0; }
+/* ปุ่ม + ชื่อร้าน อยู่แถวเดียวกับชื่อแบรนด์ (ชิดขวา — ไม่ขึ้นบรรทัดใหม่) */
+.home-top-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; flex-wrap: nowrap; }
 @media (max-width: 412px) {
-  .home-top-tt h1 { font-size: 16.5px; }
-  .home-top .bell-btn { width: 38px; height: 38px; }
+  .home-top-tt h1 { font-size: 16px; }
+  .home-top .bell-btn { width: 36px; height: 36px; }
 }
 /* จอกว้าง (เดสก์ท็อป) → กลับมาเรียงแถวเดียวได้ มีที่พอ */
 @media (min-width: 560px) {
@@ -575,11 +575,11 @@ button { font-family: inherit; cursor: pointer; }
   background: radial-gradient(120% 120% at 32% 22%, #F6E7CC, #E7CDA2); box-shadow: var(--shadow-xs);
 }
 .home-top-tt { flex: 1; min-width: 0; }
-.home-top-tt h1 { margin: 0; font-size: 18.5px; font-weight: 800; letter-spacing: -.02em; color: var(--primary-deep); line-height: 1.14; }
+.home-top-tt h1 { margin: 0; font-size: 17.5px; font-weight: 800; letter-spacing: -.02em; color: var(--primary-deep); line-height: 1.14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-top-tt p { margin: 2px 0 0; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-top .store-dd { flex: none; }
-.home-top .store-chip { padding: 7px 10px; }
-.home-top .store-chip-name { max-width: 120px; }
+.home-top .store-chip { padding: 6px 9px; }
+.home-top .store-chip-name { max-width: 58px; }
 .bell-btn {
   position: relative; width: 42px; height: 42px; border-radius: 50%; flex: none; border: 1px solid var(--border);
   background: var(--surface); display: grid; place-items: center; color: var(--text); transition: transform .12s;
@@ -1467,6 +1467,34 @@ button { font-family: inherit; cursor: pointer; }
   border: 1.5px solid var(--border); background: var(--surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2378857E' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 9px center;
   -webkit-appearance: none; appearance: none; max-width: 60%; text-overflow: ellipsis; }
 .branch-combo .bc-seg { stroke: #fff; stroke-width: .55; }
+
+/* กราฟชุดใหม่ (เจ้าของ): โดนัทช่องทาง + แท่งรายวัน + เส้นสะสม (สเกลแยก · อยู่ในการ์ด) */
+.chart-sec-head { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 -2px; }
+.chart-sec-tt { font-size: 12.5px; font-weight: 800; color: var(--text); }
+.chart-sec-sub { font-size: 10.5px; color: var(--faint); font-weight: 600; }
+.chart-divider { height: 1px; background: var(--border-soft); margin: 3px 0; }
+.chart-box { width: 100%; overflow: hidden; }
+.chart-box svg { max-width: 100%; display: block; }
+.pie { display: block; }
+.pie-seg { stroke: #fff; stroke-width: 1.2; }
+.pie-row { display: flex; align-items: center; gap: 14px; }
+.pie-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.pie-leg-item { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.pie-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.pie-leg-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 600; }
+.pie-leg-pct { font-weight: 800; color: var(--text); flex: none; }
+.pie-leg-val { color: var(--muted); font-size: 11px; flex: none; min-width: 52px; text-align: right; }
+.barchart .axis { stroke: var(--border); stroke-width: 1; }
+.barchart .grid-r { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 2 3; }
+.barchart .tick-r { font: 700 8px var(--font-num); fill: var(--faint); }
+.barchart .axis-lbl { font: 700 8px var(--font-num); fill: var(--faint); }
+
+/* เพลงร้าน: แถบเล่นจริง + ตัวตัดเพลง */
+.mplay-track { margin-top: 11px; height: 6px; border-radius: 999px; background: var(--border-soft); overflow: hidden; cursor: pointer; }
+.mplay-fill { display: block; height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, #60A5FA, #2563EB); transition: width .12s linear; }
+.trim-row { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.trim-row > span { flex: none; width: 30px; }
+.trim-range { flex: 1; accent-color: var(--primary); height: 22px; }
 .combo .grid-r { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 2 3; }
 .combo .tick-r { font: 700 8px var(--font-num); fill: var(--faint); }
 .combo .combo-cap { font: 700 8.5px var(--font-sans, inherit); fill: var(--primary-dark); }
@@ -1481,7 +1509,7 @@ button { font-family: inherit; cursor: pointer; }
 .ticker-run { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 9px;
   animation: tickerLTR 15s linear infinite; will-change: left; }
 .msg-ticker:hover .ticker-run, .msg-ticker:active .ticker-run { animation-play-state: paused; }
-@keyframes tickerLTR { 0% { left: -100%; } 100% { left: 100%; } }
+@keyframes tickerLTR { 0% { left: 100%; } 100% { left: -100%; } }
 .ticker-msg { font-size: 13px; font-weight: 700; color: var(--text-2); }
 .ticker-cta { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 800; color: #6D28D9; }
 @media (prefers-reduced-motion: reduce) {

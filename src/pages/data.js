@@ -11,9 +11,8 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, tag } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
-import { cats, menus } from "../data/store.js";
-import { catEmoji } from "../utils/formulas.js";
-import { STOCK_SEED } from "../data/seed.js";
+import { cats, menus, priceRows, items } from "../data/store.js";
+import { catEmoji, stockOf } from "../utils/formulas.js";
 
 const bold = (t) => h("b", null, t);
 
@@ -38,7 +37,7 @@ function linkCard(root, { iconName, tintCls = "green", title, sub, soft, onClick
 
 export function dataScreen(ctx) {
   const { go, role, shopCtx } = ctx;
-  const low = STOCK_SEED.filter((s) => s.st !== "ok").length;
+  const low = (items() || []).filter((it) => it.isActive !== false && stockOf(it.id).st !== "ok").length;
 
   const catBadges = h("div", { class: "rowflex", style: { flexWrap: "wrap", gap: "6px", marginTop: "11px" } },
     cats().map((c) => {
@@ -70,7 +69,7 @@ export function dataScreen(ctx) {
       linkCard(null, {
         iconName: "tag", tintCls: "green",
         title: "เมนู · ราคาขาย",
-        sub: menus().length + " เมนู · ราคาขาย − ส่วนลด = ราคาสุทธิ",
+        sub: priceRows().length + " รายการ · ตั้งขาย − ส่วนลด = สุทธิ",
         onClick: () => go({ name: "menulist" }),
       }),
 

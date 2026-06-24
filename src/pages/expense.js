@@ -10,8 +10,11 @@ import { pi } from "../components/icons.js";
 import { hdr, note, qtyInput, emptyState, dateBar, itemIc, emo } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { fmt, itemsOf, catById, unitOf } from "../utils/formulas.js";
-import { MONEY, EXP_INV_CAT, TODAY } from "../data/seed.js";
-import { saveExpenseRecord } from "../data/store.js";
+import { EXP_INV_CAT, TODAY } from "../data/seed.js";
+import { saveExpenseRecord, expenseRows } from "../data/store.js";
+
+// หมวดค่าใช้จ่าย (ตัวแรกๆ = ลิงก์ข้อมูลกลาง กรอกเป็นรายการ · ที่เหลือกรอกยอดรวม)
+const EXP_CATS = ['บรรจุภัณฑ์', 'ข้าว', 'ซอส/น้ำจิ้ม', 'อื่นๆ', 'ค่าเช่า', 'ค่าไฟ', 'ค่าน้ำ', 'เน็ต/โทร', 'ค่าส่ง/ค่าเดินทาง'];
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
@@ -34,6 +37,29 @@ export function expenseScreen(ctx) {
 }
 
 const costOf = (it) => num(est.packPrice[it.id] !== undefined ? est.packPrice[it.id] : it.cost);
+
+// แนบรูปใบเสร็จ/สลิป — <image-slot> บีบขนาดอัตโนมัติ (1200px WebP) แล้วซิงก์ขึ้น
+// Supabase Storage ผ่าน lib/image-sync.js (โชว์ได้ทุกเครื่อง · ผูกด้วย slotId)
+function receiptCard(slotId) {
+  const slot = document.createElement("image-slot");
+  slot.id = slotId;
+  slot.setAttribute("shape", "rounded");
+  slot.setAttribute("radius", "12");
+  slot.setAttribute("placeholder", "ถ่าย / แนบรูปใบเสร็จ-สลิป");
+  Object.assign(slot.style, { width: "100%", height: "148px", display: "block" });
+  return h("div", { class: "card" },
+    h("div", { style: { fontSize: "12px", fontWeight: 600, color: "var(--muted)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" } },
+      pi("receipt", 14), "แนบรูปใบเสร็จ / สลิป",
+      h("span", { style: { fontWeight: 400, color: "var(--faint)", fontSize: "11px" } }, "· บีบขนาดอัตโนมัติ")),
+    slot,
+  );
+}
+// อ่านสถานะรูปจาก slot ตอนกดบันทึก → แนบลงเรคคอร์ด (เก็บ slot ref + url ถ้าอัปแล้ว)
+function receiptFields(slotId) {
+  const u = (window.kkSlots && window.kkSlots.get) ? window.kkSlots.get(slotId) : null;
+  if (!u) return {};
+  return { receipt_slot: slotId, receipt_url: /^https?:/i.test(u) ? u : null };
+}
 
 function paint(root) {
   const { back, toast, shopCtx } = est.ctx;
@@ -75,13 +101,14 @@ function paint(root) {
   };
 
   // chips
-  const chips = MONEY.expCats.map((c) => h("button", {
+  const chips = EXP_CATS.map((c) => h("button", {
     type: "button", class: "chip" + (cat === c ? " active" : ""), onClick: () => { est.cat = c; paint(root); },
   }, EXP_INV_CAT[c] && emo(catById(EXP_INV_CAT[c]).icon, { s: 12 }), c));
   chips.push(h("button", { type: "button", class: "chip", style: { color: "var(--muted)" }, onClick: () => toast("เพิ่ม/จัดการหมวดได้ที่ ข้อมูลกลาง") }, pi("plus", 12), " เพิ่มหมวด"));
 
   let body, foot;
   if (invCatId) {
+    const rcptId = "rcpt-" + est.day + "-" + cat;
     const groups = invCat.subs
       ? invCat.subs.map((sb) => {
           const subItems = invItems.filter((i) => i.sub === sb.id);
@@ -99,23 +126,26 @@ function paint(root) {
       note(["กรอกจำนวนที่ซื้อแต่ละรายการ — ราคาต่อหน่วยปรับได้ที่ช่อง ", bold("฿/หน่วย")], { iconName: "box" }),
       ...groups,
       h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เพิ่มรายการใหม่ได้ที่ ข้อมูลกลาง (เพิ่มเติม)") }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
+      receiptCard(rcptId),
     ];
     saveBtn.addEventListener("click", () => {
       const { total, filled } = recompute();
       const lines = invItems.filter((it) => est.packQty[it.id]).map((it) => ({ id: it.id, name: it.name, qty: num(est.packQty[it.id]), cost: costOf(it) }));
-      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat, day: est.day, cat, kind: "inventory", amount: Math.round(total), count: filled, lines, at: new Date().toISOString() });
+      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat, day: est.day, cat, kind: "inventory", amount: Math.round(total), count: filled, lines, ...receiptFields(rcptId), at: new Date().toISOString() });
       toast("บันทึก" + cat + " " + est.day + " มิ.ย. ฿" + fmt(Math.round(total)) + " — บันทึกขึ้นคลาวด์แล้ว"); back();
     });
     foot = h("div", { class: "foot" }, h("div", { style: { flex: 1 } }, footCount, footTotal), saveBtn);
   } else {
+    const rcptId = "rcpt-" + est.day + "-" + cat;
     const amtIn = h("input", { type: "text", inputMode: "numeric", class: "input tnum", style: { fontSize: "22px", fontWeight: 700 }, placeholder: "0", value: est.amt });
     amtIn.addEventListener("input", () => { const s = amtIn.value.replace(/[^0-9]/g, ""); if (s !== amtIn.value) amtIn.value = s; est.amt = s; blockSave.disabled = !est.amt; blockSave.style.opacity = est.amt ? 1 : .45; });
     const detailIn = h("input", { type: "text", class: "input", placeholder: "เช่น " + (cat === "ค่าเช่า" ? "ค่าเช่ารายเดือน" : "ค่า" + cat + "รอบเดือนนี้") });
-    const savedRows = est.day === TODAY.d
-      ? MONEY.todayExp.map((e) => h("div", { class: "rowflex", style: { padding: "10px 0" } },
+    const dayRows = expenseRows().filter((r) => r.day === est.day && r.cat === cat);
+    const savedRows = dayRows.length
+      ? dayRows.map((e) => h("div", { class: "rowflex", style: { padding: "10px 0" } },
           h("span", { class: "catic blue sm" }, pi("box", 15)),
-          h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: { fontSize: "13.5px", fontWeight: 600 } }, e.cat), h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, e.note)),
-          h("span", { class: "tnum", style: { fontWeight: 700 } }, "฿" + fmt(e.amt)),
+          h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: { fontSize: "13.5px", fontWeight: 600 } }, e.cat), h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, e.note || "—")),
+          h("span", { class: "tnum", style: { fontWeight: 700 } }, "฿" + fmt(e.amount || 0)),
           h("button", { type: "button", class: "hdr-icon", style: { width: "30px", height: "30px" }, "aria-label": "แก้ไข", onClick: () => toast("แก้รายการได้จากหน้าประวัติการบันทึก") }, pi("edit", 14)),
         ))
       : [emptyState({ compact: true, iconName: "box", title: "ยังไม่มีบันทึกหมวดนี้", sub: "วันที่ " + est.day + " มิ.ย. · เพิ่มรายการด้านบน" })];
@@ -132,12 +162,13 @@ function paint(root) {
         ),
       ),
       h("button", { type: "button", class: "btn btn-block", onClick: () => toast("เพิ่มรายการใหม่ได้ที่ ข้อมูลกลาง (เพิ่มเติม)") }, pi("plus", 15), "เพิ่มรายการในหมวดนี้"),
+      receiptCard(rcptId),
       h("div", { class: "overline" }, "บันทึกแล้ว · " + est.day + " มิ.ย."),
       h("div", { class: "card", style: { padding: "4px 16px" } }, ...savedRows),
     ];
     const blockSave = h("button", { type: "button", class: "btn btn-primary btn-block", disabled: !est.amt, style: { opacity: est.amt ? 1 : .45 } }, pi("check", 17), "บันทึก");
     blockSave.addEventListener("click", () => {
-      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat + "-" + Date.now(), day: est.day, cat, kind: "amount", amount: num(est.amt), note: detailIn.value.trim(), at: new Date().toISOString() });
+      saveExpenseRecord({ id: "exp-" + est.day + "-" + cat + "-" + Date.now(), day: est.day, cat, kind: "amount", amount: num(est.amt), note: detailIn.value.trim(), ...receiptFields(rcptId), at: new Date().toISOString() });
       toast("บันทึก" + cat + " · " + est.day + " มิ.ย. ฿" + fmt(num(est.amt)) + " — บันทึกขึ้นคลาวด์แล้ว"); back();
     });
     foot = h("div", { class: "foot" }, h("button", { type: "button", class: "btn btn-block", onClick: back }, "ยกเลิก"), blockSave);

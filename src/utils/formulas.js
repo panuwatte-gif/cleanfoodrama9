@@ -4,7 +4,7 @@
 // ทุกฟังก์ชันบริสุทธิ์ (pure) — รับเข้า → คืนออก ไม่มี side-effect
 // ============================================================
 
-import { cats, items, assumptions, assume } from "../data/store.js";
+import { cats, items, assumptions, assume, stockRows } from "../data/store.js";
 import {
   TODAY, FC_BASE, DOW_SALES, STOCK_SEED, SHOP_ONLY, ORDER_CAT_IDS,
   ICON_EMOJI, ITEM_EMOJI, SUB_TINT, CAT_TINT, SECTION_TINT, UNIT_CHOICES,
@@ -114,12 +114,29 @@ export const salesStat = (id) => {
    สต๊อกต่อรายการ — ของจริง 7 ตัวใน STOCK, ที่เหลือ derive · FIFO
 ==================================================================== */
 const _lotDate = (age) => { const d = TODAY.d - age; return (d > 0 ? d : 30 + d) + " มิ.ย."; };
-export const stockOf = (id) => {
-  const real = STOCK_SEED.find((s) => s.id === id);
-  if (real) {
-    const days = Math.round((real.qty / real.use) * 10) / 10;
-    return { id, qty: real.qty, use: real.use, days, lots: real.lots.map((l) => ({ d: l.d, age: l.age, qty: l.qty })), st: real.st };
+
+// สถานะคงเหลือ (ok / mid / lo) คิดจาก "ใช้ได้อีกกี่วัน" เทียบเกณฑ์ของต่ำ (assumption)
+// ถ้ารายการมี threshold รายตัว (qty) ที่เจ้าของตั้งไว้ → ใช้ qty เป็นเกณฑ์แทน
+export const stStatus = (qty, use, threshold) => {
+  if (threshold != null && threshold !== "" && Number(threshold) > 0) {
+    const t = Number(threshold);
+    return qty <= t ? "lo" : qty <= t * 1.5 ? "mid" : "ok";
   }
+  const lowDays = Math.max(0.5, assume("low-days", 2));
+  const days = use ? qty / use : 99;
+  return days < lowDays * 0.5 ? "lo" : days < lowDays ? "mid" : "ok";
+};
+
+// เกณฑ์แจ้งเตือนรายตัว (qty) — รายการที่ตั้งเอง > ค่า default (use × low-days)
+export const threshOf = (id) => {
+  const row = stockRows().find((s) => s.id === id);
+  if (row && row.threshold != null && row.threshold !== "") return Number(row.threshold);
+  const inf = deriveStock(id);
+  return Math.round(inf.use * Math.max(0.5, assume("low-days", 2)) * 10) / 10;
+};
+
+// derive: ค่าคงเหลือประมาณการสำหรับรายการที่ "ยังไม่มีแถวสต๊อกจริง" (hash-based)
+export const deriveStock = (id) => {
   const it = itemById(id);
   const u = unitOf(it);
   const use = _round(baseFor(it), u);
@@ -134,8 +151,21 @@ export const stockOf = (id) => {
     const part = i === ages.length - 1 ? left : _round(qty / nLots, u);
     if (part > 0) { lots.push({ d: _lotDate(age), age, qty: part }); left = Math.round((left - part) * 100) / 100; }
   });
-  const st = days < 1 ? "lo" : days < 2 ? "mid" : "ok";
-  return { id, qty, use, days, lots, st };
+  return { id, qty, use, days, lots, st: stStatus(qty, use) };
+};
+
+// stockOf: อ่าน "แถวสต๊อกจริง" จากชั้นข้อมูลกลางก่อน (รับ/นับ/ทิ้ง → persist + sync)
+// ไม่มีแถวจริง → derive (เหมือนเดิม) · status คิดสดจาก qty/use/threshold
+export const stockOf = (id) => {
+  const row = stockRows().find((s) => s.id === id);
+  if (!row) return deriveStock(id);
+  const it = itemById(id);
+  const u = it ? unitOf(it) : "";
+  const use = (row.use != null) ? row.use : deriveStock(id).use;
+  const qty = Math.round((Number(row.qty) || 0) * 100) / 100;
+  const days = use ? Math.round((qty / use) * 10) / 10 : 0;
+  const lots = (row.lots || []).map((l) => ({ d: l.d, age: l.age, qty: l.qty }));
+  return { id, qty, use, days, lots, st: stStatus(qty, use, row.threshold), threshold: row.threshold, u };
 };
 
 /* แยกสต๊อกเมนูอาหารเป็น เผ็ด/ไม่เผ็ด */
@@ -259,8 +289,9 @@ export const DAILY_INEX = (() => {
   for (let d = 1; d <= TODAY.d; d++) { const m = MONEY.days[d] || { in: 0, ex: 0 }; out.push({ d, in: m.in, ex: m.ex || Math.round(m.in * COST_MODEL.varRatio + fixedMonthTotal / 30) }); }
   return out;
 })();
-export const STOCK_DAYS = () => STOCK_SEED.map((s) => {
-  const cur = Math.round((s.qty / s.use) * 10) / 10;
+export const STOCK_DAYS = () => stockRows().map((s) => {
+  const inf = stockOf(s.id);
+  const cur = inf.days;
   return { id: s.id, avg: cur, min: Math.max(0.2, Math.round(cur * 0.7 * 10) / 10), max: Math.round(cur * 1.45 * 10) / 10 };
 }).sort((a, b) => a.avg - b.avg);
 

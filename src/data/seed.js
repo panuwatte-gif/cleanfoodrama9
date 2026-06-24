@@ -112,21 +112,23 @@ export const ITEMS_SEED = [
   { id: 'dy-syrup',   cat: 'dry', name: 'น้ำเชื่อมสีสรร',  unit: 'kg', spicy: false, cost: 55 },
 ];
 
-/* ---------- เมนูขาย ---------- */
+/* ---------- เมนูขาย ----------
+   ข้าวแยกออกจากชื่อเมนูแล้ว: rice=true → เสิร์ฟพร้อมข้าว (เลือกชนิดข้าวที่ riceItem)
+   ชื่อเมนูไม่ต้องมี "+ ข้าว" — ระบบเติมป้าย "+ ข้าว" ให้เองตาม rice */
 export const MENUS_SEED = [
-  { id: 'mn-kpbeef',   item: 'kp-beef',    name: 'กระเพราเนื้อ + ข้าว',       price: 119, disc: 10 },
-  { id: 'mn-beefsalt', item: 'beef-salt',  name: 'เนื้อคั่วพริกเกลือ + ข้าว', price: 129, disc: 0 },
-  { id: 'mn-kpduck',   item: 'kp-duck',    name: 'กระเพราเป็ด + ข้าว',        price: 109, disc: 0 },
-  { id: 'mn-kpbreast', item: 'kp-breast',  name: 'กระเพราอกไก่ + ข้าว',       price: 89,  disc: 5 },
-  { id: 'mn-kpsoft',   item: 'kp-soft',    name: 'กระเพราไก่นุ่ม + ข้าว',     price: 95,  disc: 0 },
-  { id: 'mn-kpsalmon', item: 'kp-salmon',  name: 'กระเพราแซลม่อน + ข้าว',    price: 159, disc: 20 },
-  { id: 'mn-kpshrimp', item: 'kp-shrimp',  name: 'กระเพรากุ้ง + ข้าว',         price: 139, disc: 0 },
-  { id: 'mn-shrimpgar',item: 'shrimp-gar', name: 'กุ้งกระเทียม + ข้าว',       price: 135, disc: 0 },
-  { id: 'mn-eggshoyu', item: 'egg-shoyu',  name: 'ไข่ดองโชยุ (เพิ่ม)',        price: 25,  disc: 0 },
-  { id: 'mn-eggsoft',  item: 'egg-soft',   name: 'ไข่ต้มยางมะตูม (เพิ่ม)',    price: 15,  disc: 0 },
-  { id: 'mn-cocomat',  item: 'dr-cocomat', name: 'Coconut Matcha',            price: 65,  disc: 10 },
-  { id: 'mn-thaipi2',  item: 'dr-thaipi2', name: 'ชาไทยพิทาชิโอ้',            price: 69,  disc: 0 },
-  { id: 'mn-orange',   item: 'dr-orange',  name: 'น้ำส้มจี๊ด',                 price: 35,  disc: 0 },
+  { id: 'mn-kpbeef',   item: 'kp-beef',    name: 'กระเพราเนื้อ',       price: 119, disc: 10, rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-beefsalt', item: 'beef-salt',  name: 'เนื้อคั่วพริกเกลือ', price: 129, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpduck',   item: 'kp-duck',    name: 'กระเพราเป็ด',        price: 109, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpbreast', item: 'kp-breast',  name: 'กระเพราอกไก่',       price: 89,  disc: 5,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpsoft',   item: 'kp-soft',    name: 'กระเพราไก่นุ่ม',     price: 95,  disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpsalmon', item: 'kp-salmon',  name: 'กระเพราแซลม่อน',    price: 159, disc: 20, rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpshrimp', item: 'kp-shrimp',  name: 'กระเพรากุ้ง',         price: 139, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-shrimpgar',item: 'shrimp-gar', name: 'กุ้งกระเทียม',       price: 135, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-eggshoyu', item: 'egg-shoyu',  name: 'ไข่ดองโชยุ (เพิ่ม)',  price: 25,  disc: 0,  rice: false },
+  { id: 'mn-eggsoft',  item: 'egg-soft',   name: 'ไข่ต้มยางมะตูม (เพิ่ม)', price: 15, disc: 0, rice: false },
+  { id: 'mn-cocomat',  item: 'dr-cocomat', name: 'Coconut Matcha',      price: 65,  disc: 10, rice: false },
+  { id: 'mn-thaipi2',  item: 'dr-thaipi2', name: 'ชาไทยพิทาชิโอ้',      price: 69,  disc: 0,  rice: false },
+  { id: 'mn-orange',   item: 'dr-orange',  name: 'น้ำส้มจี๊ด',           price: 35,  disc: 0,  rice: false },
 ];
 
 /* ---------- assumption กลาง (เจ้าของแก้ได้) ---------- */
@@ -289,17 +291,10 @@ export const RECIPES = [
     ing: [['น้ำปลา', 200], ['มะขามเปียก', 120], ['น้ำตาลปี๊บ', 100], ['ข้าวคั่ว', 40], ['พริกป่น', 30]],
     method: ['ละลายมะขามเปียกกับน้ำปลา', 'ใส่น้ำตาลปี๊บ คนให้เข้ากัน', 'ใส่ข้าวคั่ว + พริกป่น ก่อนเสิร์ฟ'] },
 ];
-export const SONGS = [
-  { id: 'sg-1', name: 'เพลงขอบคุณลูกค้า (Original)', fmt: 'wav', len: '3:42', fav: true },
-  { id: 'sg-2', name: 'Morning Basil — เปิดร้าน', fmt: 'mp3', len: '4:10' },
-  { id: 'sg-3', name: 'Lo-fi ครัวคลีน 01', fmt: 'mp3', len: '2:58' },
-  { id: 'sg-4', name: 'Lo-fi ครัวคลีน 02', fmt: 'mp3', len: '3:21' },
-];
-export const PLAYLISTS = [
-  { id: 'pl-open', name: 'เปิดร้าน · เช้า', count: 6 },
-  { id: 'pl-rush', name: 'ช่วงพีคเที่ยง', count: 9 },
-  { id: 'pl-close', name: 'ปิดร้าน · เก็บครัว', count: 4 },
-];
+// เพลงร้าน — เริ่มจากว่างจริง (เพลงจริงมาจากการอัปโหลด → rama9_songs + Storage)
+export const SONGS = [];
+// Playlist — เริ่มว่าง · เจ้าของสร้างกลุ่มเองได้ในหน้าเพลง
+export const PLAYLISTS = [];
 export const MANUAL = [
   { id: 'mn-open', icon: 'store', name: 'เปิดร้าน (07:30)', steps: ['เปิดไฟ + แอร์ + เครื่องอุ่น', 'เช็ครับของจากสาขาหลัก ใน "สั่งของ / รับของ"', 'เช็ดเคาน์เตอร์ เตรียมสถานีแพ็ค'] },
   { id: 'mn-pack', icon: 'box', name: 'แพ็คออเดอร์', steps: ['ดูสติ๊กเกอร์ เผ็ด = แดง / ไม่เผ็ด = เขียว', 'ตักตามสูตร (ดูการ์ดสูตรอาหาร)', 'เช็คซอส + ช้อนส้อม ก่อนปิดถุง'] },

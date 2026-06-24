@@ -22,8 +22,9 @@
 import * as api from "../api/apiClient.js";
 import {
   initData, bumpData, __adoptRemote,
-  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows, recipesRows, manualRows, incomeRows, expenseRows,
+  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows, recipesRows, manualRows, payrollRows, incomeRows, expenseRows, songsRows, priceRows, countsRows,
 } from "./store.js";
+import { getEditLogs, adoptEditLogs } from "./editlog.js";
 
 // logical store collection → { gateway table key, storage kind }
 const COLLECTIONS = [
@@ -37,8 +38,14 @@ const COLLECTIONS = [
   { coll: "users",       key: "users",  readKey: "usersSafe", noPush: true, kind: "array", get: users },
   { coll: "tasks",       key: "tasks",               kind: "array", get: tasksRows },
   { coll: "recipes",     key: "recipes",             kind: "array", get: recipesRows },
+  { coll: "payroll",     key: "payroll",             kind: "array", get: payrollRows },
+  { coll: "songs",       key: "songs",               kind: "array", get: songsRows },
+  { coll: "priceList",   key: "priceList",           kind: "array", get: priceRows },
+  { coll: "counts",      key: "stockCounts",         kind: "array", get: countsRows },
   { coll: "income",      key: "incomeRecords",       kind: "array", get: incomeRows },
   { coll: "expense",     key: "expenseRecords",      kind: "array", get: expenseRows },
+  // audit trail lives in its OWN module (editlog.js, no store db) → adopt via callback
+  { coll: "editLogs",    key: "editLogs",            kind: "array", get: getEditLogs, adopt: adoptEditLogs },
 ];
 
 // Each row is stored as { id, data } — the whole object lives in the jsonb
@@ -70,7 +77,8 @@ export async function hydrateData() {
     let rows = null;
     try { rows = await api.select(d.readKey || d.key); } catch { rows = null; }
     if (rows && rows.length) {
-      __adoptRemote(d.coll, shapeFromRows(d, rows));      // cloud wins
+      const shaped = shapeFromRows(d, rows);
+      if (d.adopt) d.adopt(shaped); else __adoptRemote(d.coll, shaped); // cloud wins (editLogs merges)
       lastIds[d.coll] = new Set(rows.map((r) => r.id));
     } else if (api.isOnline() && !d.noPush) {
       const local = rowsFor(d);                            // cloud empty but online → seed it

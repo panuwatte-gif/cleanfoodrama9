@@ -9,22 +9,38 @@
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { hdr, note, tag, meter, itemIc, emo } from "../components/components.js";
+import { hdr, note, tag, meter, itemIc, emo, emptyState } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { lineChart, comboChart } from "../components/charts.js";
-import { fmt, itemById, stockOf, STOCK_DAYS, breakevenPerDay, SALES_CUM, DAILY_INEX } from "../utils/formulas.js";
-import { items } from "../data/store.js";
-import {
-  MONEY, STOCK_SEED as STOCK, REV_TARGET_YEAR, COST_MODEL, TOP_FOOD, TOP_DRINK,
-  DOW_SALES, BOTTOM_FOOD, BOTTOM_DRINK, INV_GROUPS, STOCKVAL_CUM, COUNT_RESULT,
-} from "../data/seed.js";
+import { fmt, itemById, unitOf, stockOf, STOCK_DAYS, breakevenPerDay } from "../utils/formulas.js";
+import { items, incomeRows, expenseRows } from "../data/store.js";
+import { REV_TARGET_YEAR, COST_MODEL, INV_GROUPS } from "../data/seed.js";
+import { salesRanking, latestDayResults, inferDailySales, DOW_TH } from "../utils/forecast.js";
 
 const bold = (t) => h("b", null, t);
-const lowCount = () => STOCK.filter((s) => s.st !== "ok").length;
+const lowCount = () => (items() || []).filter((it) => it.isActive !== false && stockOf(it.id).st !== "ok").length;
+
+// ---- ข้อมูลจริงจากที่บันทึก (income/expense → Supabase) ----
+// รวมยอดต่อวัน: in = ยอดขาย(gross) · ex = ค่าใช้จ่าย · เรียงตามวัน
+function realDaily() {
+  const byDay = {};
+  for (const r of incomeRows()) { const d = r.day; (byDay[d] || (byDay[d] = { d, in: 0, ex: 0 })).in += (r.gross || 0); }
+  for (const r of expenseRows()) { const d = r.day; (byDay[d] || (byDay[d] = { d, in: 0, ex: 0 })).ex += (r.amount || 0); }
+  return Object.values(byDay).sort((a, b) => a.d - b.d).map((x) => ({ d: String(x.d), in: x.in, ex: x.ex }));
+}
+function realCum(daily) { let a = 0; return daily.map((x) => ({ d: x.d, v: (a += x.in) })); }
+const realStockValue = () => Math.round((items() || []).filter((it) => it.isActive !== false)
+  .reduce((s, it) => s + (stockOf(it.id).qty || 0) * (it.cost || 0), 0));
 
 /* ===================== แท็บรายงาน ===================== */
 export function reportsScreen({ go, role, shopCtx } = {}) {
   const store = shopCtx ? shopCtx.shop : "พระราม 9";
+  const daily = realDaily();
+  const cum = realCum(daily);
+  const cumTotal = cum.length ? cum[cum.length - 1].v : 0;
+  const cumChart = cum.length
+    ? lineChart(cum.map((p) => ({ label: p.d, v: p.v })), { color: "var(--primary)" })
+    : h("div", { style: { padding: "16px 6px", textAlign: "center", color: "var(--faint)", fontSize: "12px" } }, "ยังไม่มีข้อมูล — บันทึกรายได้แล้วกราฟจะขึ้นจริง");
 
   const card = (cls, ic, icTone, title, tagEl, body, footTxt, footTone, route) =>
     h("button", { type: "button", class: "card list-press soft-card " + cls, style: { textAlign: "left", width: "100%" }, onClick: () => go({ name: route }) },
@@ -56,7 +72,7 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
   const dailyRows = [
     { ic: "chat", t: "ส่งเข้ากลุ่ม LINE", s: "เลือกหัวข้อที่จะส่ง · ระบบแต่งข้อความให้", tag: tag("รอส่ง", { kind: "warn" }), r: "linesend" },
     { ic: "history", t: "ประวัติ + แก้ย้อนหลัง", s: "ทุกการบันทึก · audit log ลบไม่ได้", r: "history" },
-    { ic: "scale", t: "ความแม่นพยากรณ์ (back-test)", s: "ทาย vs จริง · error เฉลี่ย ±5.6%", r: "fchistory" },
+    { ic: "scale", t: "ความแม่นพยากรณ์ (back-test)", s: "เทียบทาย vs จริง · อัปเดตตามข้อมูลนับ", r: "fchistory" },
   ].map((x) => {
     const chevEl = (() => { const c = pi("chev", 16); c.style.color = "var(--faint)"; return c; })();
     return h("button", { type: "button", class: "rowflex list-press", style: { width: "100%", border: 0, background: "transparent", textAlign: "left", padding: "12px 2px", borderBottom: "1px solid var(--border-soft)" }, onClick: () => go({ name: x.r }) },
@@ -73,9 +89,9 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
     hdr({ title: "รายงาน", sub: store + " · รายงานผลทั้งหมดอยู่ที่นี่", right: storeChip(shopCtx) }),
     h("div", { class: "page stack" },
       card("soft-green", "wallet", "green", "รายรับ - รายจ่าย",
-        tag("สะสม ฿" + fmt(SALES_CUM[SALES_CUM.length - 1].v), { kind: "ok", iconName: "trend" }),
-        h("div", { style: { marginTop: "12px" } }, lineChart(SALES_CUM.map((p) => ({ label: p.d, v: p.v })), { color: "var(--primary)" })),
-        "ยอดขายสะสม · มิ.ย. 2569", null, "incexpreport"),
+        tag("สะสม ฿" + fmt(cumTotal), { kind: "ok", iconName: "trend" }),
+        h("div", { style: { marginTop: "12px" } }, cumChart),
+        "ยอดขายสะสม · จากที่บันทึกจริง", null, "incexpreport"),
       card("soft-blue", "box", "blue", "Inventory Analysis",
         tag("ต่ำ " + lowCount(), { kind: "dgr", iconName: "alert" }),
         h("div", { class: "stack", style: { gap: "7px", marginTop: "12px" } }, invRows),
@@ -97,17 +113,25 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
 
 /* ===================== รายรับ-รายจ่าย (สะสม) ===================== */
 export function incExpReportScreen({ back, go } = {}) {
-  const totalIn = MONEY.monthIncome, totalEx = MONEY.monthExpense;
+  const daily = realDaily();
+  const cum = realCum(daily);
+  const cumTotal = cum.length ? cum[cum.length - 1].v : 0;
+  const totalIn = cumTotal;
+  const totalEx = daily.reduce((s, d) => s + d.ex, 0);
+  const chartEl = daily.length
+    ? comboChart({ daily, target: REV_TARGET_YEAR, breakeven: breakevenPerDay })
+    : h("div", { style: { padding: "30px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
+        "ยังไม่มีข้อมูลรายรับ-รายจ่าย", h("br"), "บันทึกที่ ", bold("รายได้"), " / ", bold("ค่าใช้จ่าย"), " แล้วกราฟจะขึ้นจริง");
   return h("div", { class: "page-wrap", "data-screen-label": "incexpreport" },
     hdr({ title: "รายรับ-รายจ่าย", sub: "กราฟผสม · สะสม · จุดคุ้มทุน", onBack: back, right: h("span", { class: "catic green" }, pi("wallet", 18)) }),
     h("div", { class: "page stack" },
       h("div", { class: "card" },
         h("div", { class: "split" },
-          h("div", null, h("div", { class: "overline" }, "รายได้สะสม · มิ.ย. 2569"), h("div", { class: "big-num", style: { fontSize: "24px", color: "var(--primary-dark)", marginTop: "1px" } }, "฿" + fmt(SALES_CUM[SALES_CUM.length - 1].v))),
+          h("div", null, h("div", { class: "overline" }, "รายได้สะสม (ที่บันทึกจริง)"), h("div", { class: "big-num", style: { fontSize: "24px", color: "var(--primary-dark)", marginTop: "1px" } }, "฿" + fmt(cumTotal))),
           h("div", { style: { textAlign: "right" } }, h("div", { class: "overline" }, "เป้า/ปี (VAT)"), h("div", { class: "tnum", style: { fontWeight: 800, fontSize: "15px", color: "#7C3AED", marginTop: "2px" } }, "฿" + fmt(REV_TARGET_YEAR))),
         ),
-        h("div", { style: { marginTop: "10px" } }, comboChart({ daily: DAILY_INEX, target: REV_TARGET_YEAR, breakeven: breakevenPerDay })),
-        h("div", { class: "combo-legend" },
+        h("div", { style: { marginTop: "10px" } }, chartEl),
+        daily.length && h("div", { class: "combo-legend" },
           h("span", null, h("i", { style: { background: "#8FD0A8" } }), "รายรับ/วัน"),
           h("span", null, h("i", { style: { background: "#F3B765" } }), "รายจ่าย/วัน"),
           h("span", { style: { color: "var(--primary)" } }, h("i", { style: { background: "currentColor" } }), "รายได้สะสม"),
@@ -129,32 +153,41 @@ export function incExpReportScreen({ back, go } = {}) {
   );
 }
 
-/* ===================== อันดับขายดี / ขายน้อย ===================== */
-function rankList(data, color, top) {
-  const max = Math.max(...data.map((d) => d.qty));
+/* ===================== อันดับขายดี / ขายน้อย (จากยอดขายอนุมาน) ===================== */
+// rows = [{id, name, total, avg, days}] จาก salesRanking()
+function rankList(rows, color, top) {
+  const max = Math.max(...rows.map((d) => d.total), 1);
   return h("div", { class: "card", style: { padding: "6px 16px 10px" } },
-    data.map((d, i) => {
+    rows.map((d, i) => {
       const it = itemById(d.id);
+      const u = it ? unitOf(it) : "";
       const no = top
         ? h("span", { class: "rank-no" }, String(i + 1))
         : h("span", { class: "rank-no", style: { background: "#FCE3E7", color: "#BE123C" } }, String(i + 1));
       return h("div", { class: "rank-row" + (top ? " top" + (i + 1) : "") },
         no, itemIc(it),
         h("div", { style: { flex: 1, minWidth: 0 } },
-          h("div", { class: "rank-name" }, it ? it.name : d.id),
-          h("div", { class: "rank-bar", style: { marginTop: "5px" } }, h("i", { style: { width: (d.qty / max * 100) + "%", background: color } })),
+          h("div", { class: "rank-name" }, d.name || (it ? it.name : d.id)),
+          h("div", { class: "rank-bar", style: { marginTop: "5px" } }, h("i", { style: { width: (d.total / max * 100) + "%", background: color } })),
         ),
-        h("div", { class: "rank-val" }, h("div", { class: "rank-qty" }, fmt(d.qty)), h("div", { class: "rank-rev" }, "฿" + fmt(d.rev))),
+        h("div", { class: "rank-val" }, h("div", { class: "rank-qty" }, fmt(d.total) + " " + u), h("div", { class: "rank-rev" }, "เฉลี่ย " + fmt(d.avg) + "/วัน")),
       );
     }),
   );
 }
 
-function dowBars(highlightCls, target) {
-  const dowMax = Math.max(...DOW_SALES.map((d) => d.v));
+// ค่าเฉลี่ยยอดขายต่อวันในสัปดาห์ (จันทร์→อาทิตย์) จากยอดขายอนุมานจริง
+function dowAverages(cats) {
+  const sums = Array(7).fill(0), cnts = Array(7).fill(0);
+  for (const it of (items() || []).filter((x) => x.isActive !== false && cats.includes(x.cat)))
+    for (const s of inferDailySales(it.id)) { sums[s.dow] += s.sales; cnts[s.dow] += 1; }
+  return [1, 2, 3, 4, 5, 6, 0].map((dw) => ({ d: DOW_TH[dw], v: cnts[dw] ? Math.round(sums[dw] / cnts[dw] * 10) / 10 : 0, has: cnts[dw] > 0 }));
+}
+function dowBars(rows, highlightCls, target) {
+  const dowMax = Math.max(...rows.map((d) => d.v), 1);
   return h("div", { class: "dow-bars" },
-    DOW_SALES.map((d) => h("div", { class: "col" + (d.d === target ? " " + highlightCls : "") },
-      h("span", { class: "v" }, Math.round(d.v / 1000) + "k"),
+    rows.map((d) => h("div", { class: "col" + (d.d === target ? " " + highlightCls : "") },
+      h("span", { class: "v" }, d.has ? String(d.v) : "—"),
       h("span", { class: "bar", style: { height: Math.max(6, d.v / dowMax * 86) + "px" } }),
       h("span", { class: "lbl" }, d.d.slice(0, 2)),
     )),
@@ -162,34 +195,58 @@ function dowBars(highlightCls, target) {
 }
 
 export function topSellersScreen({ back } = {}) {
-  const bestDow = DOW_SALES.reduce((a, b) => (b.v > a.v ? b : a)).d;
+  const food = salesRanking({ windowDays: 30, cats: ["protein", "egg"] }).slice(0, 5);
+  const drink = salesRanking({ windowDays: 30, cats: ["drink"] }).slice(0, 5);
+  const dows = dowAverages(["protein", "egg", "drink"]);
+  const hasDow = dows.some((d) => d.has);
+  const bestDow = hasDow ? dows.reduce((a, b) => (b.v > a.v ? b : a)).d : null;
+  const empty = !food.length && !drink.length;
   return h("div", { class: "page-wrap", "data-screen-label": "topsellers" },
-    hdr({ title: "อันดับขายดี", sub: "เมนูขายดี · วันขายดี · มิ.ย. 2569", onBack: back, right: h("span", { class: "catic amber" }, pi("trend", 18)) }),
+    hdr({ title: "อันดับขายดี", sub: "เมนูขายดี · วันขายดี · 30 วันล่าสุด", onBack: back, right: h("span", { class: "catic amber" }, pi("trend", 18)) }),
     h("div", { class: "page stack" },
-      h("div", { class: "split" }, h("span", { class: "overline" }, "5 อันดับขายดี · อาหาร"), tag("เฉพาะอาหาร", { kind: "ok", iconName: "pan" })),
-      rankList(TOP_FOOD, "linear-gradient(90deg,#9FD37E,#54AE7B)", true),
-      h("div", { class: "split", style: { marginTop: "4px" } }, h("span", { class: "overline" }, "5 อันดับขายดี · เครื่องดื่ม"), tag("เฉพาะเครื่องดื่ม", { kind: "fifo", iconName: "cup2" })),
-      rankList(TOP_DRINK, "linear-gradient(90deg,#7CC6E8,#2563EB)", true),
-      h("div", { class: "split", style: { marginTop: "4px" } }, h("span", { class: "overline" }, "ขายดีตามวัน · จันทร์–อาทิตย์"), tag("ดีสุด " + bestDow, { kind: "warn", iconName: "cal" })),
-      h("div", { class: "card" }, dowBars("best", bestDow),
-        note([bold("เสาร์–อาทิตย์"), " ขายดีสุด — เตรียมของ + คนให้พอ · จันทร์เบาสุด เหมาะทำความสะอาด/สต๊อก"], { iconName: "trend" })),
+      empty
+        ? emptyState({ iconName: "trend", title: "ยังจัดอันดับขายดีไม่ได้", sub: "อันดับคิดจากยอดขายที่อนุมานจากการนับสต๊อก — เริ่มนับสต๊อกทุกวัน แล้วอันดับจะขึ้นจริงทันที" })
+        : h("div", { class: "stack" },
+            food.length ? h("div", { class: "stack", style: { gap: "8px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายดี · อาหาร"), tag("เฉพาะอาหาร", { kind: "ok", iconName: "pan" })),
+              rankList(food, "linear-gradient(90deg,#9FD37E,#54AE7B)", true)) : null,
+            drink.length ? h("div", { class: "stack", style: { gap: "8px", marginTop: "4px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายดี · เครื่องดื่ม"), tag("เฉพาะเครื่องดื่ม", { kind: "fifo", iconName: "cup2" })),
+              rankList(drink, "linear-gradient(90deg,#7CC6E8,#2563EB)", true)) : null,
+            hasDow ? h("div", { class: "stack", style: { gap: "8px", marginTop: "4px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายดีตามวัน · จันทร์–อาทิตย์"), tag("ดีสุด " + bestDow, { kind: "warn", iconName: "cal" })),
+              h("div", { class: "card" }, dowBars(dows, "best", bestDow),
+                note([bold("วันขายดี"), " เตรียมของ + คนให้พอ · วันเบาเหมาะทำความสะอาด/สต๊อก — คิดจากยอดขายจริงต่อวันในสัปดาห์"], { iconName: "trend" }))) : null,
+          ),
     ),
   );
 }
 
 export function lowSellersScreen({ back } = {}) {
-  const worstDow = DOW_SALES.reduce((a, b) => (b.v < a.v ? b : a)).d;
+  const food = salesRanking({ windowDays: 30, cats: ["protein", "egg"] }).slice(-3).reverse();
+  const drink = salesRanking({ windowDays: 30, cats: ["drink"] }).slice(-3).reverse();
+  const dows = dowAverages(["protein", "egg", "drink"]);
+  const withData = dows.filter((d) => d.has);
+  const worstDow = withData.length ? withData.reduce((a, b) => (b.v < a.v ? b : a)).d : null;
+  const empty = !food.length && !drink.length;
   return h("div", { class: "page-wrap", "data-screen-label": "lowsellers" },
-    hdr({ title: "ขายน้อย — ต้องดูแล", sub: "3 อันดับขายน้อย · วันเงียบ · มิ.ย. 2569", onBack: back, right: h("span", { class: "catic rose" }, pi("down", 18)) }),
+    hdr({ title: "ขายน้อย — ต้องดูแล", sub: "อันดับขายน้อย · วันเงียบ · 30 วันล่าสุด", onBack: back, right: h("span", { class: "catic rose" }, pi("down", 18)) }),
     h("div", { class: "page stack" },
-      note([h("span", null, "เมนูขายน้อยอาจ"), bold("จัดโปรกระตุ้น"), " หรือ", bold("ลดสต๊อก/ตัดเมนู"), " เพื่อไม่ให้ของค้างเสีย — วันเงียบเหมาะทำความสะอาด/เตรียมของล่วงหน้า"], { amber: true }),
-      h("div", { class: "split" }, h("span", { class: "overline" }, "3 อันดับขายน้อย · อาหาร"), tag("เฉพาะอาหาร", { kind: "dgr", iconName: "pan" })),
-      rankList(BOTTOM_FOOD, "linear-gradient(90deg,#FBC0C8,#EF4444)", false),
-      h("div", { class: "split", style: { marginTop: "4px" } }, h("span", { class: "overline" }, "3 อันดับขายน้อย · เครื่องดื่ม"), tag("เฉพาะเครื่องดื่ม", { kind: "dgr", iconName: "cup2" })),
-      rankList(BOTTOM_DRINK, "linear-gradient(90deg,#F6B8D6,#BE185D)", false),
-      h("div", { class: "split", style: { marginTop: "4px" } }, h("span", { class: "overline" }, "ขายไม่ดีตามวัน · จันทร์–อาทิตย์"), tag("เงียบสุด " + worstDow, { kind: "warn", iconName: "cal" })),
-      h("div", { class: "card" }, dowBars("worst", worstDow),
-        note([bold(worstDow), " ขายน้อยสุด — ลดเตรียมของ · จัดโปร/จับคู่เมนู กระตุ้นวันเงียบ"], { iconName: "cal" })),
+      empty
+        ? emptyState({ iconName: "down", title: "ยังจัดอันดับขายน้อยไม่ได้", sub: "ต้องมียอดขายที่อนุมานจากการนับสต๊อกก่อน — เริ่มนับสต๊อกทุกวันแล้วกลับมาดู" })
+        : h("div", { class: "stack" },
+            note([h("span", null, "เมนูขายน้อยอาจ"), bold("จัดโปรกระตุ้น"), " หรือ", bold("ลดสต๊อก/ตัดเมนู"), " เพื่อไม่ให้ของค้างเสีย"], { amber: true }),
+            food.length ? h("div", { class: "stack", style: { gap: "8px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายน้อย · อาหาร"), tag("เฉพาะอาหาร", { kind: "dgr", iconName: "pan" })),
+              rankList(food, "linear-gradient(90deg,#FBC0C8,#EF4444)", false)) : null,
+            drink.length ? h("div", { class: "stack", style: { gap: "8px", marginTop: "4px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายน้อย · เครื่องดื่ม"), tag("เฉพาะเครื่องดื่ม", { kind: "dgr", iconName: "cup2" })),
+              rankList(drink, "linear-gradient(90deg,#F6B8D6,#BE185D)", false)) : null,
+            worstDow ? h("div", { class: "stack", style: { gap: "8px", marginTop: "4px" } },
+              h("div", { class: "split" }, h("span", { class: "overline" }, "ขายไม่ดีตามวัน · จันทร์–อาทิตย์"), tag("เงียบสุด " + worstDow, { kind: "warn", iconName: "cal" })),
+              h("div", { class: "card" }, dowBars(dows, "worst", worstDow),
+                note([bold(worstDow), " ขายน้อยสุด — ลดเตรียมของ · จัดโปร/จับคู่เมนูกระตุ้นวันเงียบ"], { iconName: "cal" }))) : null,
+          ),
     ),
   );
 }
@@ -254,16 +311,16 @@ function paintStockReport(root) {
     ...["ก่อน", "รับ", "นี้", "เสีย"].map((t) => h("th", { style: { textAlign: "right", padding: "8px 2px", fontWeight: 600 } }, t)),
     h("th", { style: { textAlign: "right", padding: "8px 0", fontWeight: 600 } }, "ขายจริง"),
   );
-  const tableRows = COUNT_RESULT.map((r) => {
+  const dayRes = latestDayResults();
+  const tableRows = (dayRes ? dayRes.rows : []).map((r) => {
     const it = itemById(r.id);
-    const sold = Math.round((r.prev + r.recv - r.count - r.waste) * 100) / 100;
     const td = (v, col) => h("td", { class: "tnum", style: { textAlign: "right", padding: "8px 2px", color: col } }, String(v));
     return h("tr", { style: { borderTop: "1px solid var(--border-soft)" } },
-      h("td", { style: { padding: "8px 0" } }, h("span", { class: "rowflex", style: { gap: "6px" } }, itemIc(it), h("span", { style: { fontSize: "12px" } }, it.name))),
+      h("td", { style: { padding: "8px 0" } }, h("span", { class: "rowflex", style: { gap: "6px" } }, itemIc(it), h("span", { style: { fontSize: "12px" } }, it ? it.name : r.id))),
       td(r.prev, "var(--muted)"), td(r.recv, "var(--muted)"),
       h("td", { class: "tnum", style: { textAlign: "right", padding: "8px 2px" } }, String(r.count)),
       td(r.waste, r.waste ? "var(--danger)" : "var(--faint)"),
-      h("td", { class: "tnum", style: { textAlign: "right", padding: "8px 0", fontWeight: 800, color: "var(--primary-dark)" } }, String(sold)),
+      h("td", { class: "tnum", style: { textAlign: "right", padding: "8px 0", fontWeight: 800, color: "var(--primary-dark)" } }, String(r.sold)),
     );
   });
 
@@ -274,20 +331,22 @@ function paintStockReport(root) {
       h("div", { class: "invtabs" }, tabs),
       h("div", { class: "card", style: { padding: "6px 16px" } }, dayRows),
       note([h("span", null, "หมวด "), bold(curGroup.name), " · ขีดเข้ม = ค่าเฉลี่ย (avg) · แท่งบาง = ช่วง min–max ที่การใช้ผันผวน — สลับหมวดด้านบนเพื่อดูแยกกัน"]),
-      h("div", { class: "overline" }, "มูลค่าสต๊อกรวมสะสม"),
+      h("div", { class: "overline" }, "มูลค่าสต๊อกรวม (ปัจจุบัน)"),
       h("div", { class: "card soft-card soft-blue" },
-        h("div", { class: "big-num", style: { fontSize: "25px", color: "#1D4ED8" } }, "฿" + fmt(STOCKVAL_CUM[STOCKVAL_CUM.length - 1].v)),
-        h("div", { style: { fontSize: "11.5px", color: "var(--muted)", marginBottom: "10px" } }, "มูลค่าของในสต๊อกตอนนี้ · 11 มิ.ย."),
-        lineChart(STOCKVAL_CUM.map((p) => ({ label: p.d, v: p.v })), { color: "#2563EB", h: 112 }),
+        h("div", { class: "big-num", style: { fontSize: "25px", color: "#1D4ED8" } }, "฿" + fmt(realStockValue())),
+        h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "คงเหลือจริง × ต้นทุน/หน่วย · คิดสดจากสต๊อกตอนนี้"),
       ),
-      h("div", { class: "split" }, h("span", { class: "overline" }, "ขายจริง · จากผลนับล่าสุด 10 มิ.ย."), tag("อ้างอิงผลนับ", { kind: "fifo", iconName: "lock" })),
-      note([h("span", null, "สูตร: "), bold("ขายจริง = คงเหลือรอบก่อน + รับเข้า − คงเหลือรอบนี้ − เสีย/ทิ้ง/โอนออก")], { iconName: "scale" }),
-      h("div", { class: "card", style: { padding: "6px 14px 10px" } },
-        h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "12px" } },
-          h("thead", null, tableHead),
-          h("tbody", null, tableRows),
-        ),
-      ),
+      h("div", { class: "split" }, h("span", { class: "overline" }, dayRes ? "ขายจริง · จากผลนับล่าสุด " + dayRes.date.slice(5) : "ขายจริง · จากผลนับ"), tag("อ้างอิงผลนับ", { kind: "fifo", iconName: "lock" })),
+      note([h("span", null, "สูตร: "), bold("ขายจริง = คงเหลือเมื่อวาน + รับเข้า − ของเสีย − คงเหลือวันนี้")], { iconName: "scale" }),
+      dayRes
+        ? h("div", { class: "card", style: { padding: "6px 14px 10px" } },
+            h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "12px" } },
+              h("thead", null, tableHead),
+              h("tbody", null, tableRows),
+            ),
+          )
+        : h("div", { class: "card", style: { padding: "18px", textAlign: "center", color: "var(--muted)", fontSize: "12.5px", lineHeight: 1.6 } },
+            "ยังคำนวณ \"ขายจริง\" ไม่ได้", h("br"), "ต้องนับสต๊อก ", bold("2 วันติดกัน"), " ระบบถึงคิดยอดขายจากผลต่างให้"),
     ),
   );
 }

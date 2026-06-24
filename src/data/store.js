@@ -17,8 +17,12 @@
 import { load, save } from "../utils/storage.js";
 import {
   CATS_SEED, ITEMS_SEED, MENUS_SEED, ASSUMPTIONS_SEED, STOCK_SEED,
-  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED, RECIPES, MANUAL,
+  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED, RECIPES, MANUAL, TODAY, PAYROLL, SONGS,
 } from "./seed.js";
+import { logEdit } from "./editlog.js";
+// stockOf อ่านแถวสต๊อกสด (live) เพื่อ seed แถวใหม่ของรายการที่ยังไม่มี
+// import วน store↔formulas ปลอดภัย: เรียกเฉพาะตอน runtime (ในฟังก์ชัน) ไม่ใช่ตอน eval
+import { stockOf } from "../utils/formulas.js";
 // background cloud sync (Supabase via api gateway). hydrateData is re-exported
 // below so the bootstrap has a single import point. scheduleSync() fires on
 // every local write so changes mirror up to Supabase (debounced).
@@ -29,6 +33,19 @@ const DATA_KEY = "data:v1";
 
 // deep clone (ข้อมูลตื้นพอ — JSON ปลอดภัยสุด)
 const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// migration เมนู: แยก "ข้าว" ออกจากชื่อ (ตัด "+ ข้าว" ท้ายชื่อ) + ตั้ง rice/riceItem
+// idempotent — รันซ้ำได้ (rice เคยตั้งแล้วจะคงไว้) · ใช้กับทั้ง local + cloud
+function migMenu(m) {
+  if (!m) return m;
+  const hadRice = /\+\s*ข้าว/.test(m.name || "");
+  const name = (m.name || "").replace(/\s*\+\s*ข้าว\s*$/, "").trim();
+  return {
+    ...m, name,
+    rice: (m.rice != null) ? m.rice : hadRice,
+    riceItem: m.riceItem || ((m.rice != null ? m.rice : hadRice) ? "rice-iraya" : null),
+  };
+}
 
 // live db — แก้ตรงนี้แล้ว persist
 let db = null;
@@ -43,9 +60,13 @@ function fresh() {
     nutriMenu: clone(MENU_NUTRI),
     nutriIngr: clone(INGR_NUTRI),
     users: clone(USERS_SEED),
-    tasks: clone(TASKS_SEED),
+    tasks: [],
     recipes: clone(RECIPES),
     manual: clone(MANUAL),
+    payroll: clone(PAYROLL),
+    songs: clone(SONGS),
+    priceList: [],
+    counts: [],
     income: [],
     expense: [],
   };
@@ -59,14 +80,23 @@ export function initData() {
   if (!db.nutriMenu) db.nutriMenu = clone(MENU_NUTRI);
   if (!db.nutriIngr) db.nutriIngr = clone(INGR_NUTRI);
   if (!db.users || !db.users.length) db.users = clone(USERS_SEED);
-  if (!db.tasks) db.tasks = clone(TASKS_SEED);
+  if (!db.tasks) db.tasks = [];
   if (!db.recipes || !db.recipes.length) db.recipes = clone(RECIPES);
   if (!db.manual || !db.manual.length) db.manual = clone(MANUAL);
+  if (!db.payroll || !db.payroll.length) db.payroll = clone(PAYROLL);
+  if (!db.songs) db.songs = clone(SONGS);
+  // กวาดเพลงเดโม (ไม่มีไฟล์เสียงจริง = ไม่มี url และไม่ใช่ไฟล์ในเครื่อง) ออก — เล่นไม่ได้อยู่แล้ว
+  db.songs = (db.songs || []).filter((s) => s && (s.url || s.local));
+  if (!db.priceList) db.priceList = [];
+  if (!db.counts) db.counts = [];
   if (!db.income) db.income = [];
   if (!db.expense) db.expense = [];
+  // migration: แยกข้าวออกจากชื่อเมนู + ตั้ง rice/riceItem (idempotent)
+  db.menus = (db.menus || []).map(migMenu);
   // migration เฟส 6: โครงงาน/ข้อความใหม่ (status submitted · due · notice/note)
   // ถ้ายังเป็นชุด seed เก่า (t-seed*) → แทนด้วยชุดเดโมใหม่ทั้งก้อน
-  if (db.tasks.some((t) => /^t-seed/.test(t.id))) db.tasks = clone(TASKS_SEED);
+  // migration: ลบงานเดโมเก่า (t-s0X / t-seed) — เริ่มจากว่างจริง
+  if (db.tasks.some((t) => /^t-s/.test(t.id))) db.tasks = db.tasks.filter((t) => !/^t-s/.test(t.id));
   return db;
 }
 
@@ -79,7 +109,10 @@ function persist() { saveDb(); scheduleSync(); }
 // it straight back to the cloud (used by data/backend.js hydrate only).
 export function __adoptRemote(coll, value) {
   const d = initData();
-  if (value != null) { d[coll] = value; saveDb(); }
+  if (value != null) {
+    if (coll === "menus" && Array.isArray(value)) value = value.map(migMenu);
+    d[coll] = value; saveDb();
+  }
 }
 
 // persistData() — บันทึก db ปัจจุบันลง localStorage แบบ "เงียบ" (ไม่ bump)
@@ -105,6 +138,11 @@ export function users() { return initData().users; }
 export function tasksRows() { return initData().tasks; }
 export function recipesRows() { return initData().recipes; }
 export function manualRows() { return initData().manual; }
+export function payrollRows() { return initData().payroll; }
+export function songsRows() { return initData().songs; }
+export function priceRows() { return initData().priceList; }
+// บันทึกการนับสต๊อกรายวัน (ledger) — ต้นทางของพยากรณ์ · 1 แถว = วันที่+รายการ
+export function countsRows() { return initData().counts; }
 export function incomeRows() { return initData().income; }
 export function expenseRows() { return initData().expense; }
 
@@ -239,6 +277,174 @@ export async function setStockQty(id, qty) {
   return clone(s || null);
 }
 
+// ============================================================
+// สต๊อกจริง — รับ / นับ / ทิ้ง / ปรับ / ตั้งเกณฑ์ (persist + sync + audit)
+// ทุกฟังก์ชันเขียนแถวใน db.stock → bumpData ให้ทุกหน้าวาดใหม่ +
+// scheduleSync ดันขึ้น rama9_stock_items อัตโนมัติ
+// ============================================================
+const _r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const _todayLot = () => TODAY.d + " " + TODAY.mon;
+// วันที่จริง (ISO YYYY-MM-DD) สำหรับ ledger พยากรณ์ — ต้องใช้วันจริงเพื่อคิดวันในสัปดาห์/หน้าต่าง 4 เดือน
+const _todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+
+// ---- daily ledger (rama9_stock_counts) — count = คงเหลือปลายวัน · recv/waste = การเคลื่อนไหวระหว่างวัน ----
+// แยกจาก lots ชัดเจน: lots = FIFO อย่างเดียว · counts = ประวัติรายวันสำหรับสูตรพยากรณ์
+function _countRow(date, itemId) {
+  const d = initData();
+  const id = date + "|" + itemId;
+  let r = d.counts.find((x) => x.id === id);
+  if (!r) { r = { id, date, item: itemId, qty: null, recv: 0, waste: 0, at: new Date().toISOString() }; d.counts.push(r); }
+  return r;
+}
+function _recCount(date, itemId, qty) { const r = _countRow(date, itemId); r.qty = _r2(qty); r.at = new Date().toISOString(); }
+function _recRecv(date, itemId, qty) { const r = _countRow(date, itemId); r.recv = _r2((r.recv || 0) + _r2(qty)); }
+function _recWaste(date, itemId, qty) { const r = _countRow(date, itemId); r.waste = _r2((r.waste || 0) + _r2(qty)); }
+
+// หาแถวสต๊อก — ถ้ายังไม่มี สร้างจากค่าประมาณ (stockOf) เพื่อให้ต่อเนื่องกับที่หน้าจอเคยแสดง
+function ensureStockRow(id) {
+  const d = initData();
+  let row = d.stock.find((s) => s.id === id);
+  if (!row) {
+    let inf; try { inf = stockOf(id); } catch (_) { inf = { qty: 0, use: 0, lots: [] }; }
+    row = { id, qty: _r2(inf.qty), use: inf.use, lots: (inf.lots || []).map((l) => ({ ...l })) };
+    d.stock.push(row);
+  }
+  if (!row.lots) row.lots = [];
+  return row;
+}
+
+// ปรับล็อตให้รวมได้ตามยอดใหม่ (คงสัดส่วน/อายุล็อตเดิม · ไม่มีล็อต = ล็อตสดวันนี้)
+function rescaleLots(row, newQty) {
+  const cur = (row.lots || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
+  if (cur <= 0) { row.lots = newQty > 0 ? [{ d: _todayLot(), lot: TODAY.d, qty: _r2(newQty), age: 0 }] : []; return; }
+  const k = newQty / cur;
+  row.lots = row.lots.map((l) => ({ ...l, qty: _r2(l.qty * k) })).filter((l) => l.qty > 0);
+}
+
+// ตัดของออกแบบ FIFO (เก่าก่อน = age มากก่อน) — ใช้ตอนทิ้ง/ของเสีย
+function reduceFifo(row, amount) {
+  let rest = _r2(amount);
+  const lots = (row.lots || []).slice().sort((a, b) => (b.age || 0) - (a.age || 0));
+  for (const l of lots) { if (rest <= 0) break; const take = Math.min(Number(l.qty) || 0, rest); l.qty = _r2(l.qty - take); rest = _r2(rest - take); }
+  row.lots = lots.filter((l) => l.qty > 0);
+}
+
+const _nm = (id) => { const it = items().find((x) => x.id === id); return it ? it.name : id; };
+
+// รับของ: บวกเข้าคงเหลือ + เพิ่มล็อตสดวันนี้
+// lines = [{ id, qty }]  (qty = จำนวนที่รับเข้า)
+export async function applyReceive(lines, by = "พนักงาน") {
+  const rows = (lines || []).filter((l) => Number(l.qty) > 0);
+  const iso = _todayISO();
+  rows.forEach(({ id, qty }) => {
+    const row = ensureStockRow(id);
+    const n = _r2(qty);
+    row.qty = _r2((Number(row.qty) || 0) + n);
+    row.lots = [...(row.lots || []), { d: _todayLot(), lot: TODAY.d, qty: n, age: 0 }];
+    _recRecv(iso, id, n);   // ledger: รับเข้าวันนี้
+  });
+  if (rows.length) { persist(); bumpData(); logEdit({ txt: "รับของเข้าสต๊อก " + rows.length + " รายการ", kind: "add", by }); }
+  return rows.length;
+}
+
+// ตรวจนับ: ตั้งคงเหลือ = ยอดที่นับได้ (set) + ปรับล็อตตามยอดใหม่
+// lines = [{ id, qty }]  (qty = ยอดนับจริง)
+export async function applyCount(lines, by = "พนักงาน") {
+  const rows = (lines || []).filter((l) => l.qty !== "" && l.qty != null);
+  const iso = _todayISO();
+  rows.forEach(({ id, qty }) => {
+    const row = ensureStockRow(id);
+    const n = _r2(qty);
+    row.qty = n;
+    rescaleLots(row, n);
+    _recCount(iso, id, n);   // ledger: คงเหลือ ณ วันนับ
+  });
+  if (rows.length) { persist(); bumpData(); logEdit({ txt: "บันทึกตรวจนับ " + rows.length + " รายการ", kind: "add", by }); }
+  return rows.length;
+}
+
+// ทิ้ง/ของเสีย: ตัดออกจากคงเหลือแบบ FIFO
+// lines = [{ id, qty, reason }]
+export async function applyWaste(lines, by = "พนักงาน") {
+  const rows = (lines || []).filter((l) => Number(l.qty) > 0);
+  const iso = _todayISO();
+  rows.forEach(({ id, qty }) => {
+    const row = ensureStockRow(id);
+    const n = _r2(qty);
+    row.qty = _r2(Math.max(0, (Number(row.qty) || 0) - n));
+    reduceFifo(row, n);
+    _recWaste(iso, id, n);   // ledger: ของเสีย/ทิ้งวันนี้
+  });
+  if (rows.length) {
+    persist(); bumpData();
+    const txt = rows.length === 1
+      ? "บันทึกของทิ้ง " + _nm(rows[0].id) + " " + _r2(rows[0].qty) + (rows[0].reason ? " (" + rows[0].reason + ")" : "")
+      : "บันทึกของทิ้ง " + rows.length + " รายการ";
+    logEdit({ txt, kind: "edit", by });
+  }
+  return rows.length;
+}
+
+// ปรับคงเหลือด้วยมือ (หน้าสต๊อก/ข้อมูลกลาง) — set + audit
+export async function editStockQty(id, qty, by = "เจ้าของ") {
+  const row = ensureStockRow(id);
+  const before = _r2(row.qty);
+  const n = _r2(qty);
+  row.qty = n;
+  rescaleLots(row, n);
+  persist(); bumpData();
+  logEdit({ txt: 'แก้คงเหลือ "' + _nm(id) + '" ' + before + " → " + n, kind: "edit", by });
+  return clone(row);
+}
+
+// ตั้งเกณฑ์แจ้งเตือนของต่ำรายตัว (qty) — "" / null = ใช้ค่ากลาง
+export async function setStockThreshold(id, v) {
+  const row = ensureStockRow(id);
+  row.threshold = (v === "" || v == null) ? null : _r2(v);
+  persist(); bumpData();
+  return clone(row);
+}
+
+// ---- ล็อต FIFO รายตัว (เพิ่ม/แก้/ลบ) — qty รวมคิดใหม่จากผลรวมล็อตเสมอ ----
+const _sumLots = (row) => _r2((row.lots || []).reduce((a, l) => a + (Number(l.qty) || 0), 0));
+
+export async function addLot(id, qty, by = "พนักงาน") {
+  const n = _r2(qty);
+  if (n <= 0) return null;
+  const row = ensureStockRow(id);
+  row.lots = [...(row.lots || []), { d: _todayLot(), lot: TODAY.d, qty: n, age: 0 }];
+  row.qty = _sumLots(row);
+  persist(); bumpData();
+  logEdit({ txt: 'เพิ่มล็อต "' + _nm(id) + '" +' + n, kind: "add", by });
+  return clone(row);
+}
+
+export async function editLot(id, lotIdx, qty, by = "เจ้าของ") {
+  const row = ensureStockRow(id);
+  const lot = (row.lots || [])[lotIdx];
+  if (!lot) return null;
+  const before = _r2(lot.qty);
+  const n = _r2(qty);
+  if (n <= 0) row.lots = row.lots.filter((_, i) => i !== lotIdx);
+  else lot.qty = n;
+  row.qty = _sumLots(row);
+  persist(); bumpData();
+  logEdit({ txt: 'แก้ล็อต "' + _nm(id) + '" ' + before + " → " + n, by });
+  return clone(row);
+}
+
+export async function removeLot(id, lotIdx, by = "เจ้าของ") {
+  const row = ensureStockRow(id);
+  const lot = (row.lots || [])[lotIdx];
+  if (!lot) return null;
+  const q = _r2(lot.qty);
+  row.lots = row.lots.filter((_, i) => i !== lotIdx);
+  row.qty = _sumLots(row);
+  persist(); bumpData();
+  logEdit({ txt: 'ลบล็อต "' + _nm(id) + '" −' + q, kind: "del", by });
+  return clone(row);
+}
+
 // ---- โภชนาการ (เพิ่ม/แก้/ลบ ต่อเมนู และต่อวัตถุดิบ) ----
 export async function saveNutri(mode, id, data) {
   const map = mode === "menu" ? nutriMenu() : nutriIngr();
@@ -316,6 +522,48 @@ export async function saveExpenseRecord(rec) {
 export async function removeExpenseRecord(id) {
   const d = initData();
   d.expense = expenseRows().filter((r) => r.id !== id);
+  persist(); bumpData();
+  return true;
+}
+
+// ---- ค่าแรงพนักงาน (payroll) — เจ้าของแก้รายชื่อ/ค่าจ้าง/OT + persist + sync ----export async function getPayroll() { return clone(payrollRows()); }
+export async function setPayroll(rows) {
+  initData().payroll = (rows || []).map((r) => ({ ...r }));
+  persist(); bumpData();
+  return clone(payrollRows());
+}
+
+// ---- เพลงร้าน (songs) — metadata + persist + sync (ไฟล์เสียงอยู่ Storage) ----
+export async function getSongs() { return clone(songsRows()); }
+export async function saveSong(song) {
+  const list = songsRows();
+  const i = list.findIndex((x) => x.id === song.id);
+  if (i >= 0) list[i] = { ...list[i], ...song };
+  else list.push({ ...song });
+  persist(); bumpData();
+  return clone(song);
+}
+export async function removeSong(id) {
+  const d = initData();
+  d.songs = songsRows().filter((s) => s.id !== id);
+  persist(); bumpData();
+  return true;
+}
+
+// ---- เมนู·ราคาขาย (price list) — ตารางเดี่ยว standalone ไม่มี FK ----
+// 1 แถว = 1 รายการขาย (กับข้าวเดียวคนละชนิดข้าว = คนละแถว) · สุทธิ = ตั้งขาย − ส่วนลด (คำนวณตอนแสดง)
+export async function getPriceList() { return clone(priceRows()); }
+export async function savePrice(row) {
+  const list = priceRows();
+  const i = list.findIndex((x) => x.id === row.id);
+  if (i >= 0) list[i] = { ...list[i], ...row };
+  else list.push({ ...row });
+  persist(); bumpData();
+  return clone(row);
+}
+export async function removePrice(id) {
+  const d = initData();
+  d.priceList = priceRows().filter((r) => r.id !== id);
   persist(); bumpData();
   return true;
 }

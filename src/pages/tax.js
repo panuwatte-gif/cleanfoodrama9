@@ -9,8 +9,8 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, tag, seg, qtyInput, toggle as toggleEl } from "../components/components.js";
 import { fmt, pit, cit, fixedMonthTotal } from "../utils/formulas.js";
-import { assume } from "../data/store.js";
-import { MONEY, COST_MODEL } from "../data/seed.js";
+import { assume, incomeRows, expenseRows } from "../data/store.js";
+import { COST_MODEL } from "../data/seed.js";
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(String(v).replace(/,/g, "")) || 0;
@@ -18,6 +18,9 @@ const SSO_MAX = 9000, LIFE_MAX = 100000;
 const realCostPct = () => Math.round(COST_MODEL.varRatio * 100);
 const fixedYear = () => fixedMonthTotal * 12;
 const actualExpenseOf = (annualRev) => Math.round(annualRev * COST_MODEL.varRatio + fixedYear());
+// ค่าเริ่มต้นจากข้อมูลจริง (รายได้/ค่าใช้จ่ายที่บันทึก) — ไม่มี = 0 (กรอกเองได้)
+const monthIncomeReal = () => Math.round(incomeRows().reduce((s, r) => s + (r.net != null ? r.net : (r.gross || 0)), 0));
+const monthExpenseReal = () => Math.round(expenseRows().reduce((s, r) => s + (r.amount || 0), 0));
 
 const txt = { tab: "calc", calc: null, plan: null, ctx: null };
 
@@ -25,8 +28,11 @@ export function taxScreen(ctx) {
   txt.ctx = ctx;
   txt.tab = "calc";
   const pd = assume("tax-deduct", 60000);
-  txt.calc = { m: String(MONEY.monthIncome), cMethod: "actual", cActual: String(actualExpenseOf(MONEY.monthIncome * 12)), cPersonal: String(pd), cSso: String(SSO_MAX), cLife: "0", cDonate: "0" };
-  txt.plan = { entity: "person", jdVat: false, gp: "30", period: "month", rev: String(MONEY.monthIncome), costPct: String(realCostPct()), deduct: "actual", pSso: String(SSO_MAX), pLife: "0", pDonate: "0" };
+  const inc = monthIncomeReal();
+  const exp = monthExpenseReal();
+  const cActualDefault = exp > 0 ? exp * 12 : actualExpenseOf(inc * 12);
+  txt.calc = { m: String(inc), cMethod: "actual", cActual: String(Math.round(cActualDefault)), cPersonal: String(pd), cSso: String(SSO_MAX), cLife: "0", cDonate: "0" };
+  txt.plan = { entity: "person", jdVat: false, gp: "30", period: "month", rev: String(inc), costPct: String(realCostPct()), deduct: "actual", pSso: String(SSO_MAX), pLife: "0", pDonate: "0" };
   const root = h("div", { class: "page-wrap", style: { display: "flex", flexDirection: "column", flex: 1 } });
   paint(root);
   return root;
