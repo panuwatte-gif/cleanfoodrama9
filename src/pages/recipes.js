@@ -9,9 +9,9 @@
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, searchBox, itemIc, emptyState } from "../components/components.js";
-import { recipesRows, saveRecipe } from "../data/store.js";
+import { recipesRows, saveRecipe, removeRecipe, moveRecipe } from "../data/store.js";
 
-const rst = { open: null, q: "", editing: {} };
+const rst = { open: null, q: "", editing: {}, confirmDel: null };
 
 export function recipesScreen(ctx) {
   const rows = recipesRows();
@@ -133,6 +133,24 @@ function recipeEditor(r, ctx) {
   );
 }
 
+// แถบควบคุมของเจ้าของ (เลื่อนขึ้น/ลง + ลบ) — ลำดับนี้ใช้ทุกหน้า (หน้าแรก + หน้าแก้สูตร อ่านชุดเดียว)
+function ownerStrip(r, idx, total, root, ctx) {
+  if (ctx.role !== "owner") return null;
+  if (rst.confirmDel === r.id) {
+    return h("div", { class: "rcp-owner-strip", style: { background: "var(--tint-rose)", borderColor: "#FECDD3" } },
+      h("span", { style: { flex: 1, fontSize: "12.5px", fontWeight: 700, color: "var(--danger-ink)" } }, 'ลบสูตร "' + r.name + '" ถาวร?'),
+      h("button", { type: "button", class: "rcp-ctrl", onClick: () => { rst.confirmDel = null; paint(root, ctx); } }, "ยกเลิก"),
+      h("button", { type: "button", class: "rcp-ctrl danger", onClick: async () => { await removeRecipe(r.id); if (rst.open === r.id) rst.open = null; delete rst.editing[r.id]; rst.confirmDel = null; ctx.toast('ลบสูตร "' + r.name + '" แล้ว'); paint(root, ctx); } }, pi("trash", 13), "ลบถาวร"),
+    );
+  }
+  return h("div", { class: "rcp-owner-strip" },
+    h("button", { type: "button", class: "rcp-ctrl", disabled: idx === 0, "aria-label": "เลื่อนขึ้น", onClick: async () => { if (idx === 0) return; await moveRecipe(r.id, -1); paint(root, ctx); } }, pi("up", 14)),
+    h("button", { type: "button", class: "rcp-ctrl", disabled: idx === total - 1, "aria-label": "เลื่อนลง", onClick: async () => { if (idx === total - 1) return; await moveRecipe(r.id, 1); paint(root, ctx); } }, pi("down", 14)),
+    h("span", { style: { flex: 1, fontSize: "11px", color: "var(--faint)" } }, "ลำดับที่ " + (idx + 1) + " / " + total),
+    h("button", { type: "button", class: "rcp-ctrl danger", onClick: () => { rst.confirmDel = r.id; paint(root, ctx); } }, pi("trash", 14), "ลบสูตร"),
+  );
+}
+
 function paint(root, ctx) {
   ctx._root = root;
   const all = recipesRows();
@@ -143,7 +161,7 @@ function paint(root, ctx) {
     hdr({ title: "สูตรอาหาร", sub: ctx.role === "owner" ? "คำนวณสัดส่วน · เจ้าของแก้สูตรได้" : "คำนวณสัดส่วน · ปรับปริมาณอัตโนมัติ", onBack: ctx.back, right: h("span", { class: "catic helper-ic-amber" }, pi("chefhat", 18)) }),
     h("div", { class: "page stack", style: { paddingBottom: "12px" } },
       searchEl,
-      rows.map((r) => {
+      rows.map((r, idx) => {
         const isOpen = rst.open === r.id;
         const editing = ctx.role === "owner" && rst.editing[r.id];
         const baseTotal = r.ing.reduce((a, ig) => a + ig[1], 0);
@@ -157,6 +175,7 @@ function paint(root, ctx) {
             editing ? h("span", { class: "owner-tag" }, pi("edit", 10), "กำลังแก้") : (r.locked && h("span", { class: "owner-tag" }, pi("lock", 10), "สูตรล็อค")),
             h("span", { class: "acc-chev" }, pi("chevd", 16)),
           ),
+          ownerStrip(r, idx, rows.length, root, ctx),
           isOpen && (editing ? recipeEditor(r, ctx) : scalableRecipe(r, ctx)),
         );
       }),

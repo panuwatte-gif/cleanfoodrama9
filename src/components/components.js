@@ -86,15 +86,29 @@ export function catTabs({ cats = allCats(), value, onChange, showAll, wrap } = {
   );
 }
 
-/* ---------- section tabs (ไอคอนบน + ชื่อล่าง) ---------- */
+/* ---------- section tabs (ไอคอนบน + ชื่อล่าง) · มีแท็บแม่ "อาหาร" ครอบ เนื้อ/หมู/เป็ด/ไก่/ปลา ---------- */
 export function sectionTabs({ cats = allCats(), value, onChange, allLabel = "เมนูทั้งหมด" } = {}) {
-  const sections = sectionsFor(cats);
-  return h("div", { class: "chip-tabs cat-tabs sec-tabs" },
-    h("button", { type: "button", class: "chip sec-chip" + (value === "all" ? " active" : ""), onClick: () => onChange("all") },
-      h("span", { class: "sec-chip-ic" }, pi("grid", 16)), allLabel),
-    sections.map((s) => h("button", {
-      type: "button", class: "chip sec-chip tint-" + s.tint + (value === s.id ? " active" : ""), onClick: () => onChange(s.id),
-    }, h("span", { class: "sec-chip-ic" }, emo(s.icon, { s: 16 })), s.name)),
+  const proteinCat = cats.find((c) => c.id === "protein");
+  const proteinSubIds = proteinCat && proteinCat.subs ? proteinCat.subs.map((s) => s.id) : [];
+  const allSecs = sectionsFor(cats);
+  const proteinSecs = allSecs.filter((s) => proteinSubIds.includes(s.id));
+  const otherSecs = allSecs.filter((s) => !proteinSubIds.includes(s.id));
+  const inFood = value === "protein" || proteinSubIds.includes(value);
+  const secChip = (active, onClick, ico, label, tint) => h("button", {
+    type: "button", class: "chip sec-chip" + (tint ? " tint-" + tint : "") + (active ? " active" : ""), onClick,
+  }, h("span", { class: "sec-chip-ic" }, ico), label);
+
+  return h("div", { class: "menutabs" },
+    h("div", { class: "chip-tabs cat-tabs sec-tabs" },
+      secChip(value === "all", () => onChange("all"), pi("grid", 16), allLabel),
+      proteinSecs.length ? secChip(inFood, () => onChange("protein"), emo(proteinCat.icon, { s: 16 }), "อาหาร", "green") : null,
+      otherSecs.map((s) => secChip(value === s.id, () => onChange(s.id), emo(s.icon, { s: 16 }), s.name, s.tint)),
+    ),
+    inFood && proteinSecs.length > 0 && h("div", { class: "chip-tabs subtabs" },
+      h("button", { type: "button", class: "chip" + (value === "protein" ? " active" : ""), onClick: () => onChange("protein") }, "ทั้งหมด"),
+      proteinSecs.map((s) => h("button", { type: "button", class: "chip" + (value === s.id ? " active" : ""), onClick: () => onChange(s.id) },
+        emo(s.icon, { s: 13 }), s.name)),
+    ),
   );
 }
 
@@ -104,18 +118,22 @@ import { items as allItems } from "../data/store.js";
 export function menuTabs({ cats = allCats(), top, sub, onTop, onSub } = {}) {
   const proteinCat = cats.find((c) => c.id === "protein");
   const proteinSubs = proteinCat && proteinCat.subs
-    ? proteinCat.subs.filter((sb) => allItems().some((i) => i.cat === "protein" && i.sub === sb.id))
+    ? proteinCat.subs.filter((sb) => allItems().some((i) => i.cat === "protein" && i.sub === sb.id && i.isActive !== false))
     : [];
   const others = cats.filter((c) => c.id !== "protein");
+  const inFood = top === "protein";
   return h("div", { class: "menutabs" },
-    h("div", { class: "chip-tabs sec-tabs" },
+    h("div", { class: "chip-tabs cat-tabs sec-tabs" },
       h("button", { type: "button", class: "chip sec-chip" + (top === "all" ? " active" : ""), onClick: () => onTop("all") },
         h("span", { class: "sec-chip-ic" }, pi("grid", 16)), "เมนูทั้งหมด"),
+      proteinSubs.length ? h("button", {
+        type: "button", class: "chip sec-chip tint-green" + (inFood ? " active" : ""), onClick: () => onTop("protein"),
+      }, h("span", { class: "sec-chip-ic" }, emo(proteinCat.icon, { s: 16 })), "อาหาร") : null,
       others.map((c) => h("button", {
         type: "button", class: "chip sec-chip tint-" + (SECTION_TINT[c.id] || c.tint) + (top === c.id ? " active" : ""), onClick: () => onTop(c.id),
       }, h("span", { class: "sec-chip-ic" }, emo(c.icon, { s: 16 })), c.name)),
     ),
-    top === "all" && proteinSubs.length > 0 && h("div", { class: "chip-tabs subtabs" },
+    inFood && proteinSubs.length > 0 && h("div", { class: "chip-tabs subtabs" },
       h("button", { type: "button", class: "chip" + (sub === "all" ? " active" : ""), onClick: () => onSub("all") }, "ทั้งหมด"),
       proteinSubs.map((sb) => h("button", { type: "button", class: "chip" + (sub === sb.id ? " active" : ""), onClick: () => onSub(sb.id) },
         emo(sb.icon, { s: 13 }), sb.name)),
@@ -209,6 +227,38 @@ export function dateBar({ day, onChange } = {}) {
       ),
     ),
     next,
+  );
+}
+
+/* ---------- date bar (ปฏิทินข้ามเดือน · ISO) — onChange(newIso) ----------
+   มีปุ่ม ‹ › เลื่อนทีละวัน + แตะวันที่/ปฏิทินไอคอน → เปิดปฏิทินเลือกวันไหนก็ได้ (ย้อนหลังหลายเดือน) */
+import { todayIso as _todayIso, parseIso as _parseIso, addDaysIso as _addDays, isFutureIso as _isFuture, thaiLong as _thaiLong } from "../utils/dateutil.js";
+export function dateBarFull({ iso, onChange } = {}) {
+  iso = iso || _todayIso();
+  const today = _todayIso();
+  const isToday = iso === today;
+  const nextIso = _addDays(iso, 1);
+  const nextDisabled = _isFuture(nextIso); // ห้ามเลยวันนี้ (กรอกอนาคตไม่ได้)
+
+  // ปฏิทินจริง (native) — ซ่อนไว้ เปิดด้วยปุ่มวันที่/ไอคอน
+  const picker = h("input", { type: "date", value: iso, max: today, style: { position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none", left: "50%", bottom: 0 } });
+  picker.addEventListener("change", () => { if (picker.value && picker.value <= today) onChange(picker.value); });
+  const openCal = () => { try { picker.showPicker(); } catch (e) { picker.focus(); picker.click(); } };
+
+  const calIc = pi("cal", 15); calIc.style.color = "var(--primary)";
+  const prev = h("button", { type: "button", class: "hdr-icon", style: { width: "32px", height: "32px" }, "aria-label": "วันก่อนหน้า", onClick: () => onChange(_addDays(iso, -1)) }, pi("chevl", 16));
+  const next = h("button", { type: "button", class: "hdr-icon", disabled: nextDisabled, style: { width: "32px", height: "32px", opacity: nextDisabled ? .35 : 1 }, "aria-label": "วันถัดไป", onClick: () => { if (!nextDisabled) onChange(nextIso); } }, pi("chev", 16));
+
+  return h("div", { class: "datebar", style: { position: "relative" } },
+    prev,
+    h("button", { type: "button", class: "datebar-pick list-press", style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", background: "transparent", border: 0, cursor: "pointer", padding: "4px 0" }, onClick: openCal },
+      calIc,
+      h("span", { style: { fontWeight: 700, fontSize: "14px" } }, (isToday ? "วันนี้ · " : "") + _thaiLong(iso)),
+      !isToday && tag("ย้อนหลัง", { kind: "warn", iconName: "history" }),
+      (() => { const c = pi("chevd", 13); c.style.color = "var(--faint)"; return c; })(),
+    ),
+    next,
+    picker,
   );
 }
 

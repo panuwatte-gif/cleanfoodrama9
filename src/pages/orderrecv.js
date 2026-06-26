@@ -44,7 +44,7 @@ function paint(root) {
     : (k, v) => { st.valsR[k] = v; save(DKR, st.valsR); };
   const open = isOrder ? st.openO : st.openR;
   const oc = orderCats(), oi = orderItems();
-  const filter = st.top === "all" ? st.sub : st.top;
+  const filter = st.top === "all" ? "all" : st.top === "protein" ? (st.sub === "all" ? "protein" : st.sub) : st.top;
   const toggleOpen = (id) => { open[id] = !(open[id] !== false); paint(root); };
 
   const foot = entryFoot({

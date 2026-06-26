@@ -8,14 +8,14 @@
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { hdr, note, seg, searchBox, itemIc, emo, emptyState, qtyInput } from "../components/components.js";
+import { hdr, note, seg, searchBox, itemIc, emo, emptyState, qtyInput, sectionTabs } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
-import { itemById, sectionsFor, sortMenus } from "../utils/formulas.js";
+import { itemById, sectionsFor, sortMenus, proteinSubIds, matchCat } from "../utils/formulas.js";
 import { cats, menus, nutriMenu, nutriIngr, saveNutri, removeNutri } from "../data/store.js";
 import { uid } from "../utils/id.js";
 
 const bold = (t) => h("b", null, t);
-const nst = { mode: "menu", q: "", ctx: null, edit: null, draft: {} };
+const nst = { mode: "menu", q: "", cat: "all", ctx: null, edit: null, draft: {} };
 const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
 
 // แถวมาโคร 4 ช่อง: พลังงาน · โปรตีน · คาร์บ · ไขมัน (ตัวเลข tabular)
@@ -100,10 +100,10 @@ function paint(root) {
 
   let body;
   if (nst.mode === "menu") {
-    const list = sortMenus(menus()).filter((m) => !q || m.name.toLowerCase().includes(q));
-    // รายการที่เพิ่มเอง (ไม่ผูกกับเมนูในระบบ)
+    const list = sortMenus(menus()).filter((m) => (!q || m.name.toLowerCase().includes(q)) && matchCat(itemById(m.item), nst.cat));
+    // รายการที่เพิ่มเอง (ไม่ผูกกับเมนูในระบบ) — โชว์เฉพาะตอนดูทั้งหมด
     const menuIds = new Set(menus().map((m) => m.id));
-    const customs = Object.keys(nutriMenu())
+    const customs = nst.cat !== "all" ? [] : Object.keys(nutriMenu())
       .filter((id) => !menuIds.has(id))
       .map((id) => ({ id, ...nutriMenu()[id] }))
       .filter((e) => !q || (e.name || "").toLowerCase().includes(q));
@@ -121,17 +121,24 @@ function paint(root) {
     const FOOD_CATS = cats().filter((c) => ["protein", "egg", "rice", "drink"].includes(c.id));
     const nodes = [];
     const seen = new Set();
+    const psub = proteinSubIds(cats());
+    let foodHeaderDone = false;
     sectionsFor(FOOD_CATS).forEach((sec) => {
       const rows = sec.items
-        .filter((it) => nutriIngr()[it.id] && (!q || it.name.toLowerCase().includes(q)))
+        .filter((it) => nutriIngr()[it.id] && matchCat(it, nst.cat) && (!q || it.name.toLowerCase().includes(q)))
         .map((it) => { seen.add(it.id); return ingrCard(root, { id: it.id, name: it.name, item: it, n: nutriIngr()[it.id] }); });
       if (rows.length) {
-        nodes.push(h("div", { class: "overline", style: { display: "flex", alignItems: "center", gap: "7px" } }, emo(sec.icon, { s: 14 }), sec.name));
+        if (psub.includes(sec.id) && !foodHeaderDone) {
+          nodes.push(h("div", { class: "overline", style: { display: "flex", alignItems: "center", gap: "7px", color: "var(--primary-dark)" } }, emo("pan", { s: 15 }), "อาหาร"));
+          foodHeaderDone = true;
+        }
+        const indent = psub.includes(sec.id);
+        nodes.push(h("div", { class: "overline", style: { display: "flex", alignItems: "center", gap: "7px", paddingLeft: indent ? "14px" : "0" } }, emo(sec.icon, { s: 14 }), sec.name));
         nodes.push(...rows);
       }
     });
-    // รายการที่เพิ่มเอง หรือไม่อยู่ในหมวดอาหารด้านบน
-    const customs = Object.keys(nutriIngr())
+    // รายการที่เพิ่มเอง หรือไม่อยู่ในหมวดอาหารด้านบน (ซ่อนเมื่อกรองหมวด)
+    const customs = nst.cat !== "all" ? [] : Object.keys(nutriIngr())
       .filter((id) => !seen.has(id))
       .map((id) => ({ id, n: nutriIngr()[id], it: itemById(id) }))
       .filter((e) => { const nm = e.it ? e.it.name : (e.n.name || ""); return !q || nm.toLowerCase().includes(q); });
@@ -149,6 +156,7 @@ function paint(root) {
     h("div", { class: "page stack" },
       note(["พลังงาน · โปรตีน · คาร์บ · ไขมัน ", bold("ต่อเมนู"), " และ ", bold("ต่อวัตถุดิบ"), " — ", bold("แตะการ์ด"), "เพื่อแก้/ลบ หรือกดปุ่มด้านล่างเพื่อเพิ่มรายการใหม่"], { iconName: "leaf" }),
       seg({ value: nst.mode, grow: true, options: [{ v: "menu", t: "ต่อเมนู" }, { v: "ingr", t: "ต่อวัตถุดิบ" }], onChange: (v) => { nst.mode = v; nst.q = ""; paint(root); } }),
+      sectionTabs({ cats: cats(), value: nst.cat, allLabel: "ทุกหมวด", onChange: (v) => { nst.cat = v; paint(root); } }),
       searchEl,
       addBtn,
       body,

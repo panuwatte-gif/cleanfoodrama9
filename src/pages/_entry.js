@@ -11,7 +11,7 @@
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { emo, note, tag, itemIc, unitSelect, emptyState, meter } from "../components/components.js";
-import { sectionsFor, itemById, unitOf, catById, subById } from "../utils/formulas.js";
+import { sectionsFor, itemById, unitOf, catById, subById, proteinSubIds } from "../utils/formulas.js";
 import { items as allItems } from "../data/store.js";
 
 /* ---------- helpers (อ่านค่าใน vals) ---------- */
@@ -133,7 +133,10 @@ export function entryList({ vals, commit, footUpdate, filter = "all", q = "", ca
     );
   }
 
-  const shown = filter === "all" ? sections : sections.filter((s) => s.id === filter);
+  const psub = proteinSubIds(cats);
+  const shown = filter === "all" ? sections
+    : filter === "protein" ? sections.filter((s) => psub.includes(s.id))
+    : sections.filter((s) => s.id === filter);
   return h("div", { class: "stack" },
     shown.map((sec) => {
       const isOpen = open[sec.id] !== false;

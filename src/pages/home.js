@@ -21,7 +21,7 @@ import {
   actionCount, homeCardSummary, inboxFor, pendingReviewFor, overdueAssignedBy,
   nameOf, isNotice, isOverdue, isDueToday,
 } from "../utils/messages.js";
-import { TODAY } from "../data/seed.js";
+import { TODAY, BRANCH_COLORS } from "../data/seed.js";
 import { incomeRows, expenseRows, items as allItems } from "../data/store.js";
 
 const DOW_FULL = { "จ.": "จันทร์", "อ.": "อังคาร", "พ.": "พุธ", "พฤ.": "พฤหัสบดี", "ศ.": "ศุกร์", "ส.": "เสาร์", "อา.": "อาทิตย์" };
@@ -121,8 +121,8 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
       h("div", { class: "home-2col" },
         h("button", { type: "button", class: "fc soft-card soft-green list-press", onClick: () => go({ name: "orderrecv", mode: "recv" }) },
           h("div", { class: "fc-title g" }, "สั่งของ / รับของ"),
-          h("div", { class: "fc-sub", html: "สถานะคำสั่งซื้อ 14 รายการ<br />แจ้งเตือน LINE แล้ว" }),
-          h("span", { class: "fc-cart" }, pi("cart", 24), h("span", { class: "n" }, "14")),
+          h("div", { class: "fc-sub", html: "สั่งของล่วงหน้า · ยืนยันรับของ<br />ดึงต้นทุนจากข้อมูลกลาง" }),
+          h("span", { class: "fc-cart" }, pi("cart", 24)),
           h("div", { class: "fc-spacer" }),
           h("span", { class: "fc-cta" }, "ดูดำเนินการ", pi("chev", 13)),
           h("span", { class: "fc-deco" }, mascot(58)),
@@ -193,7 +193,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
 
       // ตัวช่วย 4 ไทล์
       h("div", { class: "helper4" },
-        helperTile(go, "violet", "trend", "พยากรณ์ยอดขาย", "เนื้อ 2.0–2.4 kg", h("span", { class: "htile-link" }, pi("up", 10), "+5.6%"), "forecast"),
+        helperTile(go, "violet", "trend", "พยากรณ์ยอดขาย", "ประมาณ 7 วันล่วงหน้า", h("span", { class: "htile-link" }, "ดูพยากรณ์", pi("chev", 10)), "forecast"),
         helperTile(go, "amber", "chefhat", "สูตรอาหาร", "สัดส่วน · ขั้นตอน", h("span", { class: "htile-link" }, "ดูสูตรแนะนำ", pi("chev", 10)), "recipes"),
         helperTile(go, "blue", "music", "เพลงร้าน", "Playlist · ฟังเพลิน", h("span", { class: "htile-link" }, "เปิดเพลงเลย", pi("chev", 10)), "music"),
         helperTile(go, "green", "users", "คู่มือพนักงาน", "เปิด · แพ็ค · ปิด", h("span", { class: "htile-link" }, "เข้าใช้งาน", pi("chev", 10)), "manual"),
@@ -221,13 +221,18 @@ function ownerSalesBlock(go, shopCtx) {
   const net = inc.reduce((s, r) => s + (r.net || 0), 0) - exp.reduce((s, r) => s + (r.amount || 0), 0);
   const netStr = (net >= 0 ? "+฿" : "−฿") + fmt(Math.abs(net));
   const todayTotal = inc.filter((r) => r.day === TODAY.d).reduce((s, r) => s + (r.gross || 0), 0);
-  // กราฟจากยอดจริงรายวัน (รวมทุกช่องทางต่อวัน) · ยังไม่มีข้อมูล = กราฟว่าง (ไม่โชว์เดโม)
+  // ยอดขายรายวัน "แยกตามร้าน" (byBranch) · จากรายได้จริง · ยังไม่มี = กราฟว่าง
+  const shopColor = (i) => BRANCH_COLORS[i % BRANCH_COLORS.length];
+  const branches = names.map((nm, i) => ({ name: nm, color: shopColor(i) }));
+  const shopOf = (r) => r.shop || mainName;
   const _byDay = {};
-  for (const r of inc) _byDay[r.day] = (_byDay[r.day] || 0) + (r.gross || 0);
-  const series = Object.keys(_byDay).map(Number).sort((a, b) => a - b)
-    .map((d) => ({ d, byBranch: { [mainName]: _byDay[d] }, total: _byDay[d] }));
-  const branches = [{ name: mainName, color: "#54AE7B" }];
-  const todayChips = [{ name: mainName, color: "#54AE7B", today: todayTotal }];
+  for (const r of inc) {
+    const d = r.day; const sh = shopOf(r);
+    const row = (_byDay[d] || (_byDay[d] = { d, byBranch: {}, total: 0 }));
+    row.byBranch[sh] = (row.byBranch[sh] || 0) + (r.gross || 0);
+    row.total += (r.gross || 0);
+  }
+  const series = Object.values(_byDay).sort((a, b) => a.d - b.d);
 
   const statCard = (cls, icCls, ic, label, num, sub, route) =>
     h("button", { type: "button", class: "stat-card " + cls + " list-press", onClick: () => go({ name: route }) },
@@ -270,11 +275,16 @@ function ownerSalesBlock(go, shopCtx) {
       return;
     }
 
-    // โดนัท: สัดส่วนรายได้ตามช่องทาง (ทั้งหมด ไม่ขึ้นกับช่วง)
-    const chMap = {};
-    for (const r of inc) { const k = r.ch || "อื่นๆ"; chMap[k] = (chMap[k] || 0) + (r.gross || 0); }
-    const segs = Object.keys(chMap).map((k) => ({ label: k, value: chMap[k], color: CH_COLORS[k] || "#9CA3AF" }))
+    // โดนัท: สัดส่วนรายได้ "แยกตามร้าน" เสมอ (บอกว่าแต่ละร้าน generate ยอดขายกี่% ของทั้งหมด)
+    //   รองรับเปิดร้านเพิ่ม — สีคงที่ต่อร้านตามลำดับที่ตั้งไว้ · โชว์เฉพาะร้านที่มียอด
+    const shMap = {};
+    for (const r of inc) { const k = shopOf(r); shMap[k] = (shMap[k] || 0) + (r.gross || 0); }
+    const segs = names.map((nm, i) => ({ label: nm, value: shMap[nm] || 0, color: BRANCH_COLORS[i % BRANCH_COLORS.length] }))
+      .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
+    const multiShop = segs.length >= 2;
+    const pieTitle = "สัดส่วนรายได้แยกตามร้าน";
+    const pieSub = multiShop ? "% ต่อยอดรวม" : "ร้านเดียว";
     const grossAll = segs.reduce((s, x) => s + x.value, 0) || 1;
     const pieRow = h("div", { class: "pie-row" },
       pieChart(segs, { size: 128, thickness: 25 }),
@@ -288,21 +298,31 @@ function ownerSalesBlock(go, shopCtx) {
       ),
     );
 
-    // แท่ง: ยอดขายรวมรายวัน (ทุกร้าน) · สเกลของตัวเอง
-    const barData = days.map((d) => ({ label: String(d.d), v: d.total }));
-    // เส้น: รายได้สะสม (ทุกร้าน) · สเกลของตัวเอง
-    let acc = 0; const lineData = days.map((d) => ({ label: String(d.d), v: (acc += d.total) }));
+    // กราฟเดียว 2 แกน: แท่งยอดขายรายวัน (≥2 ร้าน → ซ้อนแยกร้าน · ร้านเดียว → สีพาสเทลสลับวัน) + เส้นรายได้สะสม
+    const PASTEL_BARS = ["#7FC8A9", "#86B6E8", "#B8A4E3", "#F0B68C", "#6FC9C2", "#E89BB6"];
+    const comboEl = multiShop
+      ? branchCombo({ days, branches, h: 178, fmt })
+      : branchCombo({ days, branches, h: 178, fmt, cycleColors: PASTEL_BARS, lineColor: "#7C3AED" });
+    const barLegend = multiShop
+      ? h("div", { class: "pie-legend", style: { marginTop: "8px" } },
+          branches.filter((b) => (shMap[b.name] || 0) > 0).map((b) => h("div", { class: "pie-leg-item" },
+            h("span", { class: "pie-dot", style: { background: b.color } }),
+            h("span", { class: "pie-leg-name" }, b.name),
+            h("span", { class: "pie-leg-val tnum" }, "฿" + fmt(shMap[b.name])),
+          )))
+      : h("div", { class: "combo-legend", style: { marginTop: "8px" } },
+          h("span", null, h("i", { style: { background: "#86B6E8" } }), "ยอดขายรายวัน"),
+          h("span", { style: { color: "#7C3AED" } }, h("i", { style: { background: "currentColor" } }), "รายได้สะสม"));
 
     chartCard.replaceChildren(
       h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "ภาพรวมยอดขายทุกร้าน"), sel),
-      secTitle("สัดส่วนรายได้ตามช่องทาง", "ทั้งหมด"),
+      secTitle(pieTitle, pieSub),
       pieRow,
+      !multiShop && h("div", { style: { fontSize: "10.5px", color: "var(--faint)", marginTop: "-2px" } }, "เปิดอีกร้านแล้วเลือกร้านก่อนบันทึกรายได้ — กราฟจะแยกสัดส่วน % ต่อร้านให้อัตโนมัติ"),
       h("div", { class: "chart-divider" }),
-      secTitle("ยอดขายรวมรายวัน", "ทุกร้าน · บาท"),
-      h("div", { class: "chart-box" }, barChart(barData, { h: 116, color: "#54AE7B" })),
-      h("div", { class: "chart-divider" }),
-      secTitle("รายได้สะสม", "ทุกร้าน · บาท"),
-      h("div", { class: "chart-box" }, lineChart(lineData, { color: "#3B82F6", h: 96 })),
+      secTitle("ยอดขายรายวัน + รายได้สะสม", multiShop ? "แท่ง=แยกร้าน · เส้น=สะสม" : "แท่ง=รายวัน · เส้น=สะสม"),
+      h("div", { class: "chart-box" }, comboEl),
+      barLegend,
       h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
         pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
     );

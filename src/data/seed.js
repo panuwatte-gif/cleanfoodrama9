@@ -9,6 +9,11 @@
 // วันที่อ้างอิง: พฤหัส 11 มิ.ย. 2569
 // ============================================================
 
+// ยอดขายรายวันต่อรายการ (จากชีตพนักงาน มิ.ย. 2026) — ป้อนเครื่องพยากรณ์
+export { SALES_SEED } from "./salesSeed.js";
+// เมนู·ราคาขายตั้งต้น (standalone price list) + หมวด + หมวด add-on
+export { PRICE_SEED, PRICE_CATS, ADDON_CAT } from "./priceSeed.js";
+
 // วันที่ "จริง" จากเครื่องผู้ใช้ (พ.ศ. = ค.ศ.+543)
 const _DOW_ABBR = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 const _DOW_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
@@ -23,6 +28,10 @@ function _mkDay(dt) {
 const _NOW = new Date();
 const _TMR = new Date(_NOW.getFullYear(), _NOW.getMonth(), _NOW.getDate() + 1);
 export const TODAY = _mkDay(_NOW);
+// วันนี้แบบตัวเลข (ปี ค.ศ. · เดือน 1-12 · วัน) — ใช้กับปฏิทินข้ามเดือน (รายรับ-จ่าย)
+export const TODAY_YMD = { y: _NOW.getFullYear(), m: _NOW.getMonth() + 1, d: _NOW.getDate() };
+export const MON_ABBR = _MON_ABBR;
+export const DOW_ABBR = _DOW_ABBR;
 export const TOMORROW = Object.assign(_mkDay(_TMR), {
   label: _DOW_FULL[_TMR.getDay()] + ' ' + _TMR.getDate() + ' ' + _MON_ABBR[_TMR.getMonth()],
 });
@@ -55,14 +64,14 @@ export const CATS_SEED = [
 
 /* ลำดับใน array = ลำดับมาตรฐานทุกหน้า · spicy:true = มีช่อง เผ็ด/ไม่เผ็ด */
 export const ITEMS_SEED = [
-  { id: 'kp-beef',    cat: 'protein', sub: 'beef',    name: 'กระเพราเนื้อ',       unit: 'kg', spicy: true,  cost: 320 },
+  { id: 'kp-beef',    cat: 'protein', sub: 'beef',    name: 'กะเพราเนื้อ',       unit: 'kg', spicy: true,  cost: 320 },
   { id: 'beef-salt',  cat: 'protein', sub: 'beef',    name: 'เนื้อคั่วพริกเกลือ', unit: 'kg', spicy: false, cost: 330 },
-  { id: 'kp-duck',    cat: 'protein', sub: 'duck',    name: 'กระเพราเป็ด',        unit: 'kg', spicy: true,  cost: 260 },
-  { id: 'kp-breast',  cat: 'protein', sub: 'chicken', name: 'กระเพราอกไก่',       unit: 'kg', spicy: true,  cost: 180 },
-  { id: 'kp-soft',    cat: 'protein', sub: 'chicken', name: 'กระเพราไก่นุ่ม',     unit: 'kg', spicy: true,  cost: 195 },
+  { id: 'kp-duck',    cat: 'protein', sub: 'duck',    name: 'กะเพราเป็ด',        unit: 'kg', spicy: true,  cost: 260 },
+  { id: 'kp-breast',  cat: 'protein', sub: 'chicken', name: 'กะเพราอกไก่',       unit: 'kg', spicy: true,  cost: 180 },
+  { id: 'kp-soft',    cat: 'protein', sub: 'chicken', name: 'กะเพราไก่นุ่ม',     unit: 'kg', spicy: true,  cost: 195 },
   { id: 'breast',     cat: 'protein', sub: 'chicken', name: 'อกไก่',              unit: 'kg', spicy: false, cost: 150 },
-  { id: 'kp-salmon',  cat: 'protein', sub: 'fish',    name: 'กระเพราแซลม่อน',    unit: 'kg', spicy: true,  cost: 520 },
-  { id: 'kp-shrimp',  cat: 'protein', sub: 'shrimp',  name: 'กระเพรากุ้ง',         unit: 'kg', spicy: true,  cost: 410 },
+  { id: 'kp-salmon',  cat: 'protein', sub: 'fish',    name: 'กะเพราแซลม่อน',    unit: 'kg', spicy: true,  cost: 520 },
+  { id: 'kp-shrimp',  cat: 'protein', sub: 'shrimp',  name: 'กะเพรากุ้ง',         unit: 'kg', spicy: true,  cost: 410 },
   { id: 'shrimp-gar', cat: 'protein', sub: 'shrimp',  name: 'กุ้งกระเทียม',       unit: 'kg', spicy: false, cost: 410 },
   { id: 'egg-raw',   cat: 'egg', name: 'ไข่ไก่ดิบ',       unit: 'แผง', icon: 'eggtray', spicy: false, cost: 115, note: '1 แผง = 30 ฟอง' },
   { id: 'egg-boil',  cat: 'egg', name: 'ไข่ต้ม',           unit: 'ฟอง', icon: 'eggboil', spicy: false, cost: 6 },
@@ -116,13 +125,13 @@ export const ITEMS_SEED = [
    ข้าวแยกออกจากชื่อเมนูแล้ว: rice=true → เสิร์ฟพร้อมข้าว (เลือกชนิดข้าวที่ riceItem)
    ชื่อเมนูไม่ต้องมี "+ ข้าว" — ระบบเติมป้าย "+ ข้าว" ให้เองตาม rice */
 export const MENUS_SEED = [
-  { id: 'mn-kpbeef',   item: 'kp-beef',    name: 'กระเพราเนื้อ',       price: 119, disc: 10, rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpbeef',   item: 'kp-beef',    name: 'กะเพราเนื้อ',       price: 119, disc: 10, rice: true,  riceItem: 'rice-iraya' },
   { id: 'mn-beefsalt', item: 'beef-salt',  name: 'เนื้อคั่วพริกเกลือ', price: 129, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
-  { id: 'mn-kpduck',   item: 'kp-duck',    name: 'กระเพราเป็ด',        price: 109, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
-  { id: 'mn-kpbreast', item: 'kp-breast',  name: 'กระเพราอกไก่',       price: 89,  disc: 5,  rice: true,  riceItem: 'rice-iraya' },
-  { id: 'mn-kpsoft',   item: 'kp-soft',    name: 'กระเพราไก่นุ่ม',     price: 95,  disc: 0,  rice: true,  riceItem: 'rice-iraya' },
-  { id: 'mn-kpsalmon', item: 'kp-salmon',  name: 'กระเพราแซลม่อน',    price: 159, disc: 20, rice: true,  riceItem: 'rice-iraya' },
-  { id: 'mn-kpshrimp', item: 'kp-shrimp',  name: 'กระเพรากุ้ง',         price: 139, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpduck',   item: 'kp-duck',    name: 'กะเพราเป็ด',        price: 109, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpbreast', item: 'kp-breast',  name: 'กะเพราอกไก่',       price: 89,  disc: 5,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpsoft',   item: 'kp-soft',    name: 'กะเพราไก่นุ่ม',     price: 95,  disc: 0,  rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpsalmon', item: 'kp-salmon',  name: 'กะเพราแซลม่อน',    price: 159, disc: 20, rice: true,  riceItem: 'rice-iraya' },
+  { id: 'mn-kpshrimp', item: 'kp-shrimp',  name: 'กะเพรากุ้ง',         price: 139, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
   { id: 'mn-shrimpgar',item: 'shrimp-gar', name: 'กุ้งกระเทียม',       price: 135, disc: 0,  rice: true,  riceItem: 'rice-iraya' },
   { id: 'mn-eggshoyu', item: 'egg-shoyu',  name: 'ไข่ดองโชยุ (เพิ่ม)',  price: 25,  disc: 0,  rice: false },
   { id: 'mn-eggsoft',  item: 'egg-soft',   name: 'ไข่ต้มยางมะตูม (เพิ่ม)', price: 15, disc: 0, rice: false },
@@ -131,38 +140,29 @@ export const MENUS_SEED = [
   { id: 'mn-orange',   item: 'dr-orange',  name: 'น้ำส้มจี๊ด',           price: 35,  disc: 0,  rice: false },
 ];
 
-/* ---------- assumption กลาง (เจ้าของแก้ได้) ---------- */
+/* ---------- assumption กลาง (เจ้าของแก้ได้) ----------
+   • perShop:true  = ตั้งค่าแยกแต่ละร้านได้ (byShop) — ใช้กับร้านที่กำลังเปิด/เพิ่ม
+   • use           = "สูตรไหนใช้ค่านี้จริง" (โชว์ในหน้าปรับค่า เพื่อให้รู้ว่าค่าไหนผูกกับระบบ)
+   กลุ่มแยกชัด: รายได้(แยกร้าน) · เกณฑ์เตือนสต๊อก · หน่วย&การแปลง · พยากรณ์ · ภาษี */
 export const ASSUMPTIONS_SEED = [
-  { id: 'gp-grab',    grp: 'รายได้', name: 'GP Grab',                 v: '30', unit: '%' },
-  { id: 'gp-lineman', grp: 'รายได้', name: 'GP Lineman',              v: '30', unit: '%' },
-  { id: 'gp-shopee',  grp: 'รายได้', name: 'GP Shopee',               v: '28', unit: '%' },
-  { id: 'mkt-pct',    grp: 'รายได้', name: 'ค่าการตลาดเริ่มต้น',      v: '2.5', unit: '%' },
-  { id: 'egg-tray',   grp: 'สต๊อก',  name: 'ไข่ 1 แผง',               v: '30', unit: 'ฟอง' },
-  { id: 'low-days',   grp: 'สต๊อก',  name: 'เกณฑ์สต๊อกต่ำ (ใช้ได้อีก)', v: '2',  unit: 'วัน' },
-  { id: 'order-buf',  grp: 'พยากรณ์', name: 'เผื่อความปลอดภัยใบสั่งของ', v: '10', unit: '%' },
-  { id: 'fc-window',  grp: 'พยากรณ์', name: 'ใช้ข้อมูลย้อนหลัง',       v: '3',  unit: 'เดือน' },
-  { id: 'tax-lump',   grp: 'ภาษี',   name: 'หักค่าใช้จ่ายเหมา ม.40(8)', v: '60', unit: '%' },
-  { id: 'tax-deduct', grp: 'ภาษี',   name: 'ลดหย่อนส่วนตัว',          v: '60000', unit: 'บาท' },
-  { id: 'vat-line',   grp: 'ภาษี',   name: 'เกณฑ์จด VAT',             v: '1800000', unit: 'บาท/ปี' },
+  { id: 'gp-grab',    grp: 'รายได้', name: 'GP Grab',    v: '30',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Grab (ตัวช่วยคิด GP)' },
+  { id: 'gp-lineman', grp: 'รายได้', name: 'GP Lineman', v: '30',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Lineman' },
+  { id: 'gp-shopee',  grp: 'รายได้', name: 'GP Shopee',  v: '28',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Shopee' },
+  { id: 'mkt-pct',    grp: 'รายได้', name: 'ค่าการตลาดเริ่มต้น', v: '2.5', unit: '%', perShop: true, use: 'บันทึกรายได้ · ค่าการตลาด' },
+  { id: 'low-days',   grp: 'เกณฑ์เตือนสต๊อก', name: 'เกณฑ์สต๊อกต่ำ (เหลือพอขายกี่วัน)', v: '2', unit: 'วัน', use: 'สถานะสต๊อก ต่ำ/ใกล้หมด/พอ · หน้าแรก + หน้าสต๊อก' },
+  { id: 'egg-tray',   grp: 'หน่วย & การแปลง', name: 'ไข่ 1 แผง', v: '30', unit: 'ฟอง', use: 'แปลงหน่วย แผง → ฟอง (หน้าแปลงหน่วย)' },
+  { id: 'order-buf',  grp: 'พยากรณ์', name: 'เผื่อความปลอดภัยใบสั่งของ', v: '10', unit: '%', use: 'พยากรณ์ · คำนวณ "แนะนำสั่ง/วัน"' },
+  { id: 'fc-window',  grp: 'พยากรณ์', name: 'ใช้ข้อมูลย้อนหลัง',       v: '3',  unit: 'เดือน', use: 'พยากรณ์ · ความกว้างช่วงคาดการณ์' },
+  { id: 'tax-lump',   grp: 'ภาษี',   name: 'หักค่าใช้จ่ายเหมา ม.40(8)', v: '60', unit: '%', use: 'หน้าภาษี · คำนวณภาษีบุคคล' },
+  { id: 'tax-deduct', grp: 'ภาษี',   name: 'ลดหย่อนส่วนตัว',          v: '60000', unit: 'บาท', use: 'หน้าภาษี · คำนวณภาษีบุคคล' },
+  { id: 'vat-line',   grp: 'ภาษี',   name: 'เกณฑ์จด VAT',             v: '1800000', unit: 'บาท/ปี', use: 'หน้าภาษี · เตือนใกล้ถึงเกณฑ์ VAT' },
 ];
 
+// metadata โครงสร้าง (grp/name/unit/use/perShop) ของค่ามาตรฐาน — ใช้ migrate ข้อมูลเก่าใน localStorage
+export const ASSUMP_META = Object.fromEntries(ASSUMPTIONS_SEED.map((a) => [a.id, a]));
+
 /* ---------- สต๊อกคงเหลือ (ตัวเด่น demo) ---------- */
-export const STOCK_SEED = [
-  { id: 'kp-shrimp', qty: 0.3, use: 0.6, st: 'lo',
-    lots: [{ d: '10 มิ.ย.', lot: 27, qty: 0.3, age: 1 }] },
-  { id: 'egg-shoyu', qty: 18, use: 23, st: 'mid',
-    lots: [{ d: '8 มิ.ย.', lot: 24, qty: 6, age: 3 }, { d: '10 มิ.ย.', lot: 27, qty: 12, age: 1 }] },
-  { id: 'kp-beef', qty: 2.4, use: 2.1, st: 'mid',
-    lots: [{ d: '9 มิ.ย.', lot: 25, qty: 0.9, age: 2 }, { d: '11 มิ.ย.', lot: 28, qty: 1.5, age: 0 }] },
-  { id: 'pk-box1', qty: 2, use: 0.8, st: 'mid',
-    lots: [{ d: '5 มิ.ย.', lot: 19, qty: 2, age: 6 }] },
-  { id: 'dr-cocomat', qty: 9, use: 3, st: 'ok',
-    lots: [{ d: '7 มิ.ย.', lot: 22, qty: 4, age: 4 }, { d: '10 มิ.ย.', lot: 27, qty: 5, age: 1 }] },
-  { id: 'kp-salmon', qty: 1.2, use: 0.5, st: 'ok',
-    lots: [{ d: '10 มิ.ย.', lot: 27, qty: 1.2, age: 1 }] },
-  { id: 'rice-iraya', qty: 8, use: 1.3, st: 'ok',
-    lots: [{ d: '5 มิ.ย.', lot: 19, qty: 8, age: 6 }] },
-];
+export const STOCK_SEED = []; // เริ่มว่างจริง — คงเหลือมาจากการนับ/รับของจริง (sync Supabase)
 
 export const SHRINK_DEMO = { gone: 2.3, waste: 0.2, sold: 2.1 };
 
@@ -353,12 +353,8 @@ export const INV_GROUPS = [
   { id: 'drink', name: 'เครื่องดื่ม', icon: 'cup2', tint: 'blue',  cats: ['drink'] },
   { id: 'pack',  name: 'บรรจุภัณฑ์',  icon: 'box', tint: 'orange', cats: ['pack'] },
 ];
-export const PAYROLL = [
-  { id: 'pr-1', name: 'ปอ',      type: 'daily',   wage: 480,  otRate: 60, otHours: 1.5, days: 26 },
-  { id: 'pr-2', name: 'แนน',     type: 'daily',   wage: 450,  otRate: 56, otHours: 1,   days: 24 },
-  { id: 'pr-3', name: 'มิน (เมียนมา)', type: 'monthly', wage: 13000, otRate: 50, otHours: 20, days: 30 },
-  { id: 'pr-4', name: 'เจ๊แดง (ครัว)', type: 'monthly', wage: 16000, otRate: 70, otHours: 12, days: 30 },
-];
+// เริ่มว่างจริง — เจ้าของเพิ่มรายชื่อพนักงาน/ค่าจ้างจริงในหน้า "ค่าแรงพนักงาน"
+export const PAYROLL = [];
 export const BOTTOM_FOOD = [
   { id: 'shrimp-gar', qty: 38, rev: 4180 },
   { id: 'beef-salt', qty: 44, rev: 5676 },
@@ -466,46 +462,5 @@ export const UNIT_CHOICES = ['kg', 'g', 'ฟอง', 'แผง', 'ขวด', '
    kcal=พลังงาน · p=โปรตีน(g) · c=คาร์บ(g) · f=ไขมัน(g)
    เจ้าของแก้/เพิ่มค่าจริงได้ภายหลัง (ค่าพวกนี้เป็นค่าตั้งต้นไว้ให้ดูโครง)
 ==================================================================== */
-export const INGR_NUTRI = {
-  // โปรตีน (ดิบ ต่อ 100 ก.)
-  'kp-beef':    { per: '100 ก.', kcal: 250, p: 26,   c: 0,   f: 15 },
-  'beef-salt':  { per: '100 ก.', kcal: 250, p: 26,   c: 0,   f: 15 },
-  'kp-duck':    { per: '100 ก.', kcal: 135, p: 19,   c: 0,   f: 6 },
-  'kp-breast':  { per: '100 ก.', kcal: 120, p: 22.5, c: 0,   f: 2.6 },
-  'kp-soft':    { per: '100 ก.', kcal: 120, p: 22.5, c: 0,   f: 2.6 },
-  'breast':     { per: '100 ก.', kcal: 120, p: 22.5, c: 0,   f: 2.6 },
-  'kp-salmon':  { per: '100 ก.', kcal: 208, p: 20,   c: 0,   f: 13 },
-  'kp-shrimp':  { per: '100 ก.', kcal: 99,  p: 24,   c: 0.2, f: 0.3 },
-  'shrimp-gar': { per: '100 ก.', kcal: 99,  p: 24,   c: 0.2, f: 0.3 },
-  // ไข่ (ต่อฟอง ~50 ก.)
-  'egg-raw':    { per: '1 ฟอง', kcal: 70, p: 6,   c: 0.6, f: 5 },
-  'egg-boil':   { per: '1 ฟอง', kcal: 70, p: 6,   c: 0.6, f: 5 },
-  'egg-soft':   { per: '1 ฟอง', kcal: 70, p: 6,   c: 0.6, f: 5 },
-  'egg-shoyu':  { per: '1 ฟอง', kcal: 78, p: 6.5, c: 2,   f: 5 },
-  // ข้าว (สุก ต่อ 100 ก.)
-  'rice-iraya': { per: '100 ก. สุก', kcal: 130, p: 2.7, c: 28, f: 0.3 },
-  'rice-horm':  { per: '100 ก. สุก', kcal: 130, p: 2.7, c: 28, f: 0.3 },
-  'rice-berry': { per: '100 ก. สุก', kcal: 110, p: 3,   c: 23, f: 1 },
-  // เครื่องดื่ม (ต่อขวด)
-  'dr-orange':  { per: '1 ขวด', kcal: 35, p: 0, c: 9,  f: 0 },
-  'dr-ginger':  { per: '1 ขวด', kcal: 30, p: 0, c: 8,  f: 0 },
-  'dr-cocomat': { per: '1 ขวด', kcal: 60, p: 1, c: 10, f: 2 },
-  'dr-thaipi2': { per: '1 ขวด', kcal: 90, p: 2, c: 14, f: 3 },
-  'dr-matchap': { per: '1 ขวด', kcal: 80, p: 2, c: 12, f: 2.5 },
-  'dr-grape':   { per: '1 ขวด', kcal: 45, p: 0, c: 11, f: 0 },
-};
-export const MENU_NUTRI = {
-  'mn-kpbeef':   { kcal: 620, p: 34, c: 70, f: 22 },
-  'mn-beefsalt': { kcal: 640, p: 35, c: 68, f: 24 },
-  'mn-kpduck':   { kcal: 540, p: 30, c: 70, f: 16 },
-  'mn-kpbreast': { kcal: 470, p: 33, c: 70, f: 8 },
-  'mn-kpsoft':   { kcal: 490, p: 32, c: 70, f: 10 },
-  'mn-kpsalmon': { kcal: 600, p: 32, c: 70, f: 20 },
-  'mn-kpshrimp': { kcal: 470, p: 30, c: 70, f: 8 },
-  'mn-shrimpgar':{ kcal: 460, p: 29, c: 70, f: 8 },
-  'mn-eggshoyu': { kcal: 78,  p: 6.5, c: 2, f: 5 },
-  'mn-eggsoft':  { kcal: 70,  p: 6,  c: 0.6, f: 5 },
-  'mn-cocomat':  { kcal: 60,  p: 1,  c: 10, f: 2 },
-  'mn-thaipi2':  { kcal: 90,  p: 2,  c: 14, f: 3 },
-  'mn-orange':   { kcal: 35,  p: 0,  c: 9,  f: 0 },
-};
+export const INGR_NUTRI = {}; // เริ่มว่างจริง — เจ้าของกรอกค่าโภชนาการจริงในแอป
+export const MENU_NUTRI = {}; // เริ่มว่างจริง — เจ้าของกรอกค่าโภชนาการจริงในแอป

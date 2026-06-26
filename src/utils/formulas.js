@@ -4,7 +4,7 @@
 // ทุกฟังก์ชันบริสุทธิ์ (pure) — รับเข้า → คืนออก ไม่มี side-effect
 // ============================================================
 
-import { cats, items, assumptions, assume, stockRows } from "../data/store.js";
+import { cats, items, assumptions, assume, stockRows, salesRows } from "../data/store.js";
 import {
   TODAY, FC_BASE, DOW_SALES, STOCK_SEED, SHOP_ONLY, ORDER_CAT_IDS,
   ICON_EMOJI, ITEM_EMOJI, SUB_TINT, CAT_TINT, SECTION_TINT, UNIT_CHOICES,
@@ -58,6 +58,20 @@ export const sectionsFor = (cs) => {
     }
   });
   return out;
+};
+
+/* ---------- ตัวกรองหมวดแบบรวม "อาหาร" (protein parent) ----------
+   ทุกหน้าใช้โครงเดียวกัน: tab "อาหาร" ครอบ เนื้อ/หมู/เป็ด/ไก่/ปลา/กุ้ง
+   value: "all" ทุกอย่าง · "protein" อาหารทั้งหมด · sub-id เฉพาะหมวดย่อย · cat-id หมวดนั้น */
+export const proteinSubIds = (cs = cats()) => {
+  const p = cs.find((c) => c.id === "protein");
+  return p && p.subs ? p.subs.map((s) => s.id) : [];
+};
+export const matchCat = (it, value, cs = cats()) => {
+  if (!it || value === "all" || value == null) return true;
+  if (value === "protein") return it.cat === "protein";
+  if (proteinSubIds(cs).includes(value)) return it.cat === "protein" && it.sub === value;
+  return it.cat === value;
 };
 
 export const orderCats = () => cats().filter((c) => ORDER_CAT_IDS.includes(c.id));
@@ -138,34 +152,75 @@ export const threshOf = (id) => {
 // derive: ค่าคงเหลือประมาณการสำหรับรายการที่ "ยังไม่มีแถวสต๊อกจริง" (hash-based)
 export const deriveStock = (id) => {
   const it = itemById(id);
-  const u = unitOf(it);
-  const use = _round(baseFor(it), u);
-  const h = _hash(id);
-  const daysCover = 0.8 + (h % 45) / 10;
-  const qty = _round(use * daysCover, u);
-  const days = use ? Math.round((qty / use) * 10) / 10 : 0;
-  const nLots = 1 + (h % 3);
-  const ages = [6, 3, 1].slice(0, nLots);
-  let left = qty; const lots = [];
-  ages.forEach((age, i) => {
-    const part = i === ages.length - 1 ? left : _round(qty / nLots, u);
-    if (part > 0) { lots.push({ d: _lotDate(age), age, qty: part }); left = Math.round((left - part) * 100) / 100; }
-  });
-  return { id, qty, use, days, lots, st: stStatus(qty, use) };
+  const u = it ? unitOf(it) : "";
+  // ไม่มีแถวสต๊อกจริง = ยังไม่ได้นับ/รับเข้า → คืนค่าว่าง (ไม่ปั้นตัวเลขเดโม)
+  // คงเหลือ/อัตราใช้จริงมาจากการนับ-รับของจริงเท่านั้น (sync Supabase)
+  return { id, qty: 0, use: 0, days: 0, lots: [], st: "ok", u };
 };
 
 // stockOf: อ่าน "แถวสต๊อกจริง" จากชั้นข้อมูลกลางก่อน (รับ/นับ/ทิ้ง → persist + sync)
 // ไม่มีแถวจริง → derive (เหมือนเดิม) · status คิดสดจาก qty/use/threshold
+// use (อัตราใช้/วัน): ถ้าแถวไม่ได้ตั้งไว้ → ใช้ยอดขายเฉลี่ย/วันจาก ledger (avgDailyUse) → "อยู่ได้อีกกี่วัน" คำนวณได้
 export const stockOf = (id) => {
   const row = stockRows().find((s) => s.id === id);
   if (!row) return deriveStock(id);
   const it = itemById(id);
   const u = it ? unitOf(it) : "";
-  const use = (row.use != null) ? row.use : deriveStock(id).use;
+  const use = (row.use != null && row.use > 0) ? row.use : avgDailyUse(id);
   const qty = Math.round((Number(row.qty) || 0) * 100) / 100;
   const days = use ? Math.round((qty / use) * 10) / 10 : 0;
   const lots = (row.lots || []).map((l) => ({ d: l.d, age: l.age, qty: l.qty }));
   return { id, qty, use, days, lots, st: stStatus(qty, use, row.threshold), threshold: row.threshold, u };
+};
+
+// อัตราใช้เฉลี่ย/วัน จาก ledger ยอดขายรายวัน (flat baseline) — ใช้คิด "อยู่ได้กี่วัน"
+// เฉลี่ยยอดขายต่อวันที่มีบันทึก · ไม่มีข้อมูล = 0
+// ⚠ ใช้เฉพาะ "ช่วง 30 วันล่าสุด" ของข้อมูลที่มี (ไม่เอาของเก่ามาเฉลี่ยรวม → อัตราเพี้ยน)
+const _USE_WINDOW = 30;
+export const avgDailyUse = (id) => {
+  const rows = salesRows().filter((r) => r.item === id && r.sold != null && r.date);
+  if (!rows.length) return 0;
+  // กรอบ 30 วันล่าสุดเทียบกับวันที่ใหม่สุดที่มีบันทึกของรายการนี้
+  const latest = rows.reduce((mx, r) => (r.date > mx ? r.date : mx), rows[0].date);
+  const cut = new Date(new Date(latest + "T00:00:00").getTime() - _USE_WINDOW * 86400000);
+  const cutIso = cut.getFullYear() + "-" + String(cut.getMonth() + 1).padStart(2, "0") + "-" + String(cut.getDate()).padStart(2, "0");
+  let sum = 0, n = 0;
+  for (const r of rows) { if (r.date >= cutIso) { sum += Number(r.sold) || 0; n++; } }
+  return n ? Math.round((sum / n) * 1000) / 1000 : 0;
+};
+
+/* ====================================================================
+   การแสดงผลคงเหลือ/อัตราใช้/อยู่ได้กี่วัน — ให้ตรงหน่วย + ไม่โชว์เลขเพี้ยน
+   • ของนับเป็นชิ้น (ขวด/ฟอง/ซอง/แผง/แพ็ค…) = จำนวนเต็มเสมอ
+   • ชั่งน้ำหนัก (kg/g) = ทศนิยม 1 ตำแหน่ง
+==================================================================== */
+export const isCountUnit = (u) => !(u === "kg" || u === "g");
+export const fmtQty = (qty, u) => {
+  const n = Number(qty) || 0;
+  return isCountUnit(u) ? fmt(Math.round(n)) : fmt(Math.round(n * 10) / 10);
+};
+// อัตราใช้/วัน (โชว์ละเอียดพอ — อัตราอาจ < 1/วัน) · kg = 2 ตำแหน่ง · นับชิ้น = 1 ตำแหน่ง
+export const fmtRate = (r, u) => {
+  const n = Number(r) || 0;
+  return String((u === "kg" || u === "g") ? Math.round(n * 100) / 100 : Math.round(n * 10) / 10);
+};
+// เพดาน "อยู่ได้กี่วัน" — เกินนี้ถือว่าสต๊อกเกิน/ของเตรียมส่งสาขาอื่น (ไม่ใช่ขายช้า)
+export const DAYS_CAP = 30;
+// อยู่ได้อีกกี่วัน = คงเหลือ ÷ อัตราใช้/วัน · cap ที่ DAYS_CAP (over=true → แสดง "30+")
+export const coverDays = (id) => {
+  const inf = stockOf(id);
+  if (!inf.use || inf.use <= 0 || !inf.qty) return { days: null, raw: null, over: false, use: inf.use || 0, qty: inf.qty || 0, u: inf.u };
+  const raw = Math.round((inf.qty / inf.use) * 10) / 10;
+  return { days: raw > DAYS_CAP ? DAYS_CAP : raw, raw, over: raw > DAYS_CAP, use: inf.use, qty: inf.qty, u: inf.u };
+};
+// จุดสั่งซื้อ (reorder point) เป็น "หน่วยจริง" = อัตราใช้/วัน × เกณฑ์ของต่ำ (low-days)
+//   ของนับชิ้น → ปัดขึ้นเต็มหน่วย (อย่างน้อย 1) · kg → ทศนิยม 1 ตำแหน่ง · ไม่มีอัตราใช้ = null
+export const reorderPoint = (id) => {
+  const inf = stockOf(id);
+  const lead = Math.max(0.5, assume("low-days", 2));
+  const raw = (inf.use || 0) * lead;
+  if (raw <= 0) return null;
+  return isCountUnit(inf.u) ? Math.max(1, Math.ceil(raw)) : Math.round(raw * 10) / 10;
 };
 
 /* แยกสต๊อกเมนูอาหารเป็น เผ็ด/ไม่เผ็ด */

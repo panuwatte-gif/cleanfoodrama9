@@ -182,6 +182,22 @@ button { font-family: inherit; cursor: pointer; }
 .acc-card.open .acc-head { background: var(--primary-tint); }
 .acc-chev { transition: transform .2s; color: var(--faint); display: grid; place-items: center; }
 .acc-card.open .acc-chev { transform: rotate(180deg); }
+/* แถบควบคุมของเจ้าของในการ์ดสูตร (เลื่อนขึ้น/ลง · ลบ) */
+.rcp-owner-strip { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border-soft); background: var(--surface-tint); }
+.rcp-ctrl { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 600; transition: transform .1s, background .15s; }
+.rcp-ctrl svg { width: 14px; height: 14px; }
+.rcp-ctrl:active { transform: scale(.94); background: var(--primary-tint); color: var(--primary-dark); }
+.rcp-ctrl:disabled { opacity: .35; }
+.rcp-ctrl.danger { color: var(--danger); border-color: #FECDD3; }
+.rcp-ctrl.danger:active { background: var(--tint-rose); color: var(--danger-ink); }
+/* ปรับค่า assumption — แถวค่า + ป้าย "ใช้กับสูตรไหน" + แท็บเลือกร้าน */
+.asm-row .asm-use { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.asm-row .asm-use.ref { display: inline-flex; align-items: center; gap: 4px; color: var(--warning-ink); margin-top: 6px; }
+.asm-row .asm-use.ref svg { width: 11px; height: 11px; }
+.asm-shoptabs { display: flex; gap: 7px; flex-wrap: wrap; }
+.asm-shoptab { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 600; transition: background .15s, color .15s; }
+.asm-shoptab svg { width: 12px; height: 12px; }
+.asm-shoptab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .entry-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--border-soft); }
 .entry-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; }
 .qty-in {
@@ -1333,7 +1349,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- การ์ดยอดขายทุกสาขา (เจ้าของ) ---------- */
 .sales-card { padding: 15px 16px; display: flex; flex-direction: column; gap: 11px;
-  background: radial-gradient(130% 120% at 100% 0%, rgba(167,201,122,.16) 0%, transparent 55%), var(--surface); }
+  background: linear-gradient(170deg, #F3F0FB 0%, #EEF6F1 48%, #FBF1F4 100%); border-color: #E7E1F3; }
 .sales-total { font: 800 22px/1 var(--font-num); letter-spacing: -.02em; color: var(--primary-deep); flex: none; }
 .sales-branches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .sb-chip { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 8px 9px; border-radius: 14px;
@@ -1444,8 +1460,8 @@ button { font-family: inherit; cursor: pointer; }
 .stat-card { display: flex; flex-direction: column; gap: 2px; padding: 13px 14px; border-radius: 20px; text-align: left;
   border: 1.5px solid var(--border-soft); background: var(--surface); box-shadow: var(--shadow-xs); transition: transform .1s; }
 .stat-card:active { transform: scale(.99); }
-.sc-sales { border-color: #D4EBCC; background: radial-gradient(135% 130% at 100% 0%, rgba(84,174,123,.16) 0%, transparent 60%), var(--surface); }
-.sc-net   { border-color: #D5E4FB; background: radial-gradient(135% 130% at 100% 0%, rgba(91,155,246,.15) 0%, transparent 60%), var(--surface); }
+.sc-sales { border-color: #CFEBD8; background: linear-gradient(160deg, #EAF7EF 0%, #DDF1E6 100%); }
+.sc-net   { border-color: #CFE0FA; background: linear-gradient(160deg, #EAF1FE 0%, #DCE8FC 100%); }
 .sc-top { display: flex; align-items: center; gap: 8px; }
 .sc-ic { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none;
   background: var(--primary-soft); color: var(--primary-dark); }
@@ -1500,6 +1516,26 @@ button { font-family: inherit; cursor: pointer; }
 .combo .combo-cap { font: 700 8.5px var(--font-sans, inherit); fill: var(--primary-dark); }
 .combo .combo-end { font: 800 10px var(--font-num); fill: var(--primary-deep); }
 
+/* เส้นสะสม 3 เส้น (รายรับ/รายจ่าย/กำไร) + แท่งรายได้รายวัน */
+.combo.cumlines .cl-bar { fill: #DCE6F4; }
+.cumlines .cl-in { fill: none; stroke: #34B97A; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.cumlines .cl-ex { fill: none; stroke: #EF8C3B; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.cumlines .cl-pf { fill: none; stroke: #7C3AED; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.cumlines .cl-dot-in { fill: #34B97A; stroke: #fff; stroke-width: 1.5; }
+.cumlines .cl-dot-ex { fill: #EF8C3B; stroke: #fff; stroke-width: 1.5; }
+.cumlines .cl-dot-pf { fill: #7C3AED; stroke: #fff; stroke-width: 1.5; }
+
+/* Inventory Analysis — แถวรายการ (อ่านง่าย · หน่วยตรง · ไม่โชว์เลขเพี้ยน) */
+.inv-row { display: flex; gap: 11px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.inv-row:first-child { border-top: 0; }
+.inv-body { flex: 1; min-width: 0; }
+.inv-name { font-weight: 700; font-size: 13.5px; }
+.inv-meta { display: flex; gap: 5px 11px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin: 3px 0 7px; align-items: baseline; }
+.inv-meta .tnum { font-variant-numeric: tabular-nums; }
+.inv-right { flex: none; text-align: right; min-width: 56px; }
+.inv-right .q { font: 800 18px/1 var(--font-num); font-variant-numeric: tabular-nums; }
+.inv-right .qu { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
 /* แถบข้อความวิ่ง (หัวหน้า/พนักงาน) */
 .msg-ticker { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 16px; overflow: hidden;
   border: 1.5px solid #E6DCF6; background: linear-gradient(90deg, #F6F1FE 0%, #FCEEF4 100%); transition: transform .1s; }
@@ -1533,3 +1569,31 @@ button { font-family: inherit; cursor: pointer; }
 .ds-check { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
   border: 1.5px solid var(--border); background: var(--surface); color: #fff; }
 .ds-check.on { background: var(--primary); border-color: var(--primary); }
+
+/* ====================================================================
+   ท่าทาง (gestures) — ลากเลื่อนแถบแท็บบน PC + เงาบอกเลื่อนได้ + ปัดขอบจอ back/forward
+==================================================================== */
+/* แถบแท็บแนวนอนที่เลื่อนได้ → ชี้ว่าจับลากได้บน PC */
+.cat-tabs, .sec-tabs, .subtabs, .md-tabs, .fc7-daystrip, .fc7-days, .kk-hscroll {
+  cursor: grab; scroll-behavior: smooth; touch-action: pan-x;
+}
+.kk-dragging { cursor: grabbing !important; scroll-behavior: auto !important; user-select: none; scroll-snap-type: none; }
+.kk-dragging * { pointer-events: none; }
+
+/* เงาจาง ๆ ขอบซ้าย/ขวา = ยังมีแท็บให้เลื่อนต่อ (ค่อย ๆ จางที่ขอบจริง ๆ) */
+.kk-fade-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent); }
+.kk-fade-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 26px), transparent); }
+.kk-fade-l.kk-fade-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 26px, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(to right, transparent, #000 26px, #000 calc(100% - 26px), transparent); }
+
+/* ตัวบอกปัดขอบจอ = back / forward */
+.kk-edge-hint { position: fixed; top: 50%; z-index: 80; width: 46px; height: 46px; margin-top: -23px;
+  display: grid; place-items: center; border-radius: 50%; pointer-events: none;
+  background: var(--surface, #fff); box-shadow: 0 6px 22px rgba(31,46,38,.22), 0 0 0 1px var(--border-soft, #e5e9e6);
+  opacity: 0; transition: opacity .14s; }
+.kk-edge-hint.left { left: 12px; }
+.kk-edge-hint.right { right: 12px; }
+.kk-edge-hint.on { opacity: calc(.45 + var(--p, 0) * .55); }
+.kk-edge-arrow { width: 13px; height: 13px; border-left: 2.5px solid var(--primary, #2f8f5b); border-bottom: 2.5px solid var(--primary, #2f8f5b); }
+.kk-edge-hint.left .kk-edge-arrow { transform: rotate(45deg); margin-left: 4px; }
+.kk-edge-hint.right .kk-edge-arrow { transform: rotate(-135deg); margin-right: 4px; }
+@media (prefers-reduced-motion: reduce) { .kk-edge-hint { transition: none; } .cat-tabs, .sec-tabs, .subtabs, .md-tabs, .fc7-daystrip, .fc7-days { scroll-behavior: auto; } }

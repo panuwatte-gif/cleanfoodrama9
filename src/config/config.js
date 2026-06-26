@@ -64,6 +64,7 @@ export const CONFIG = {
     payroll: "rama9_payroll",                 // ค่าแรงพนักงาน (รายวัน/เงินเดือน + OT)
     songs: "rama9_songs",                     // เพลงร้าน (metadata · ไฟล์เสียงอยู่ใน Storage)
     priceList: "rama9_price_list",            // เมนู·ราคาขาย — ตารางเดี่ยว standalone (จดโปร · ไม่มี FK)
+    salesDaily: "rama9_sales_daily",          // ยอดขายรายวันต่อรายการ (ledger ป้อนพยากรณ์) — 1 แถว = วัน+รายการ
   },
 
   // Storage bucket for expense receipt images (Supabase Storage, private).

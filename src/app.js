@@ -31,6 +31,7 @@ import { countScreen } from "./pages/count.js";
 import { orderRecvScreen } from "./pages/orderrecv.js";
 import { wasteScreen } from "./pages/waste.js";
 import { stockListScreen } from "./pages/stocklist.js";
+import { alertSettingsScreen } from "./pages/alerts.js";
 import { stockDetailScreen } from "./pages/stockdetail.js";
 import { masterScreen } from "./pages/master.js";
 import { assumptionsScreen } from "./pages/assumptions.js";
@@ -50,19 +51,23 @@ import { execSummaryScreen } from "./pages/execsummary.js";
 import { orderExpenseScreen } from "./pages/orderexpense.js";
 import { lineSendScreen } from "./pages/linesend.js";
 import { reportsScreen, incExpReportScreen, topSellersScreen, lowSellersScreen, stockReportScreen } from "./pages/reports.js";
+import { stockNowScreen, recvReportScreen } from "./pages/stockview.js";
 import { dataScreen } from "./pages/data.js";
 import { nutritionScreen } from "./pages/nutrition.js";
 import { menuListScreen } from "./pages/menulist.js";
+import { forecastSettingsScreen } from "./pages/forecastsettings.js";
 import { messagesScreen } from "./pages/messages.js";
 import { exportScreen } from "./pages/export.js";
 import "./lib/image-slot.js"; // ลงทะเบียน <image-slot> + window.kkSlots
 import { initImageSync } from "./lib/image-sync.js"; // เชื่อมรูป ↔ Supabase Storage
+import { initGestures } from "./lib/gestures.js"; // ลากเลื่อนแท็บ (PC) + ปัดขอบจอ back/forward
 
 // ---- เปลือกสถานะแอป (single source สำหรับ navigation) ----
 const S = {
   user: load("session", null),      // { role } | null  (null = หน้า login)
   tab: "home",                      // home | data | reports | more | account
   stack: [],                        // route ที่ push ทับ (จอลึก)
+  fwd: [],                          // route ที่ back ออกมา (ไว้ปัดขอบขวา = forward)
   dash: false,                      // เปิด Dash sheet?
   theme: loadTheme(),
   iconStyle: load("iconStyle", "emoji"),  // emoji | line
@@ -86,10 +91,22 @@ const role = () => { const u = liveUser(); return u ? (u.role || "owner") : "own
 // ---- navigation ----
 function go(route) {
   S.stack = route && route.replace ? [...S.stack.slice(0, -1), route] : [...S.stack, route];
+  S.fwd = [];                       // นำทางใหม่ = ล้างประวัติ forward
   renderChrome();
 }
-function back() { S.stack = S.stack.slice(0, -1); renderChrome(); }
-function onTab(id) { S.tab = id; S.stack = []; renderChrome(); }
+function back() {
+  if (!S.stack.length) return;
+  S.fwd = [S.stack[S.stack.length - 1], ...S.fwd];
+  S.stack = S.stack.slice(0, -1);
+  renderChrome();
+}
+function forward() {
+  if (!S.fwd.length) return;
+  S.stack = [...S.stack, S.fwd[0]];
+  S.fwd = S.fwd.slice(1);
+  renderChrome();
+}
+function onTab(id) { S.tab = id; S.stack = []; S.fwd = []; renderChrome(); }
 function openDash() { S.dash = true; renderOverlay(); }
 function closeDash() { S.dash = false; renderOverlay(); }
 
@@ -160,6 +177,7 @@ function renderContent() {
       case "orderrecv":     return orderRecvScreen({ ...sctx, mode: r.mode });
       case "waste":         return wasteScreen(sctx);
       case "stocklist":     return stockListScreen({ ...sctx, low: r.low });
+      case "alerts":        return alertSettingsScreen(sctx);
       case "stockdetail":   return stockDetailScreen({ ...sctx, id: r.id });
       case "master":        return masterScreen(sctx);
       case "assumptions":   return assumptionsScreen(sctx);
@@ -172,9 +190,10 @@ function renderContent() {
       case "unitconvert":   return unitConvertScreen(sctx);
       // ---- เฟส 3: เงิน · รายงาน · พยากรณ์ · ภาษี ----
       case "money":         return moneyScreen(sctx);
-      case "income":        return incomeScreen({ ...sctx, day: r.day });
-      case "expense":       return expenseScreen({ ...sctx, day: r.day });
+      case "income":        return incomeScreen({ ...sctx, date: r.date });
+      case "expense":       return expenseScreen({ ...sctx, date: r.date });
       case "forecast":      return forecastScreen(sctx);
+      case "forecastsettings": return forecastSettingsScreen(sctx);
       case "fchistory":     return fcHistoryScreen({ ...sctx, id: r.id });
       case "tax":           return taxScreen(sctx);
       case "execsummary":   return execSummaryScreen(sctx);
@@ -185,6 +204,8 @@ function renderContent() {
       case "topsellers":    return topSellersScreen(sctx);
       case "lowsellers":    return lowSellersScreen(sctx);
       case "stockreport":   return stockReportScreen(sctx);
+      case "stocknow":      return stockNowScreen(sctx);
+      case "recvreport":    return recvReportScreen(sctx);
       case "nutrition":     return nutritionScreen(sctx);
       case "menulist":      return menuListScreen(sctx);
       case "messages":      return messagesScreen(sctx);
@@ -233,6 +254,7 @@ function renderChrome() {
   );
   applyTheme(shell, S.theme);
   chromeLayer.appendChild(shell);
+  if (window.__kkRefreshHints) window.__kkRefreshHints(); // อัปเดตเงาขอบแถบแท็บ
 
   // dash sheet ผูกกับ shell theme เช่นกัน — รีเฟรช overlay ให้ตรง role
   renderOverlay();
@@ -271,6 +293,9 @@ function boot() {
   subscribeData(() => renderChrome());
 
   renderChrome();
+
+  // ท่าทาง: ลากแท็บด้วยเมาส์ (PC) + ปัดขอบจอ back/forward (มือถือ)
+  initGestures({ back, forward, canBack: () => S.stack.length > 0, canForward: () => S.fwd.length > 0 });
 
   // LIFF (LINE) = ออปชันเสริม — ทำงานเฉพาะตอน ENABLED=true เท่านั้น
   // default ENABLED=false → เป็น webapp ปกติ ไม่ error

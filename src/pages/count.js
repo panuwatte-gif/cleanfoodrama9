@@ -49,7 +49,7 @@ function paint(root) {
   const top = isCount ? st.top : st.topW;
   const subF = isCount ? st.sub : st.subW;
   const q = isCount ? st.q : st.qW;
-  const filter = top === "all" ? subF : top;
+  const filter = top === "all" ? "all" : top === "protein" ? (subF === "all" ? "protein" : subF) : top;
   const open = isCount ? st.open : st.openW;
   const toggleOpen = (id) => { open[id] = !(open[id] !== false); paint(root); };
 
@@ -108,7 +108,7 @@ function doSaveAdd() {
 }
 
 function addSheetBody(root) {
-  const nameIn = h("input", { type: "text", class: "input", value: st.newName, placeholder: "เช่น กระเพราหมูกรอบ" });
+  const nameIn = h("input", { type: "text", class: "input", value: st.newName, placeholder: "เช่น กะเพราหมูกรอบ" });
   const unitIn = h("input", { type: "text", class: "input", value: st.newUnit, placeholder: "kg / ฟอง / แพ็ค" });
   const saveBtn = h("button", { type: "button", class: "btn btn-primary btn-block", disabled: !st.newName, style: { opacity: st.newName ? 1 : 0.45 }, onClick: () => { if (st.newName) doSaveAdd(); } }, pi("check", 16), "เพิ่ม");
   nameIn.addEventListener("input", () => { st.newName = nameIn.value; saveBtn.disabled = !st.newName; saveBtn.style.opacity = st.newName ? 1 : 0.45; });

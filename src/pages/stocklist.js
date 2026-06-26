@@ -8,7 +8,7 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { searchBox, note, tag, itemIc, menuTabs, hdr, meter, toggle, qtyInput, emo } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
-import { sectionsFor, stockOf, stockVariants, itemById, unitOf, threshOf } from "../utils/formulas.js";
+import { sectionsFor, stockOf, stockVariants, itemById, unitOf, threshOf, proteinSubIds } from "../utils/formulas.js";
 import { cats, items as allItems, stockRows, editStockQty, setStockThreshold } from "../data/store.js";
 
 const st = {
@@ -35,11 +35,13 @@ function variantNode(root, it, v) {
   const isChild = v.tag === "hot" || v.tag === "mild";
   const isOpen = st.openItem === it.id + ":" + v.key;
   const dcol = v.st === "lo" ? "var(--danger)" : v.st === "mid" ? "var(--warning)" : "var(--primary-dark)";
+  // จำกัดไม่ให้ over (เกิน 30 วัน → "30+")
+  const dDisp = (v.days != null && v.days > 30) ? "30+" : String(v.days);
 
   const detail = isOpen && h("div", { class: "stk-detail" },
     h("div", { class: "stk-line41" },
       pi("sun", 15),
-      h("div", null, "เหลือ ", bold(v.qty + " " + u), " · แยกเป็น ", bold(v.lots.length + " ล็อต (FIFO)"), " · ใช้ได้อีกประมาณ ", bold(v.days + " วัน"), " ", h("span", { style: { color: "var(--muted)" } }, "(ขายเฉลี่ย " + v.use + " " + u + "/วัน)")),
+      h("div", null, "เหลือ ", bold(v.qty + " " + u), " · แยกเป็น ", bold(v.lots.length + " ล็อต (FIFO)"), " · ใช้ได้อีกประมาณ ", bold(dDisp + " วัน"), " ", h("span", { style: { color: "var(--muted)" } }, "(ขายเฉลี่ย " + v.use + " " + u + "/วัน)")),
     ),
     h("div", { style: { margin: "8px 0 4px" } }, meter(Math.min(100, v.days / 7 * 100), v.st === "lo" ? "lo" : v.st === "mid" ? "warn" : "")),
     h("div", { class: "overline", style: { marginTop: "10px" } }, "FIFO ละเอียด · ตอนนี้มี " + v.qty + " " + u),
@@ -76,7 +78,7 @@ function variantNode(root, it, v) {
       ),
       h("div", { style: { textAlign: "right", flex: "none", minWidth: "52px" } },
         h("div", { style: { fontSize: "9.5px", color: "var(--faint)", fontWeight: 600, lineHeight: 1.1 } }, "ใช้ได้อีก"),
-        h("div", { class: "big-num", style: { fontSize: (isChild ? 17 : 20) + "px", color: dcol, lineHeight: 1.05 } }, String(v.days)),
+        h("div", { class: "big-num", style: { fontSize: (isChild ? 17 : 20) + "px", color: dcol, lineHeight: 1.05 } }, dDisp),
         h("div", { style: { fontSize: "10px", color: "var(--faint)" } }, "วัน"),
       ),
       h("span", { class: "stk-chev" + (isOpen ? " on" : "") }, pi("chevd", 15)),
@@ -88,9 +90,10 @@ function variantNode(root, it, v) {
 function paint(root) {
   const ctx = st.ctx;
   const storeName = ctx.shopCtx ? ctx.shopCtx.shop : "พระราม 9";
-  const filter = st.top === "all" ? st.sub : st.top;
+  const filter = st.top === "all" ? "all" : st.top === "protein" ? (st.sub === "all" ? "protein" : st.sub) : st.top;
   const q = st.q, lowOnly = st.lowOnly;
   const lowCount = allItems().filter((it) => stockOf(it.id).st !== "ok").length;
+  const psub = proteinSubIds(cats());
 
   const sections = sectionsFor(cats()).map((sec) => {
     const list = sec.items.filter((it) => {
@@ -100,7 +103,7 @@ function paint(root) {
       return true;
     });
     return { ...sec, items: list };
-  }).filter((sec) => sec.items.length && (filter === "all" || sec.id === filter));
+  }).filter((sec) => sec.items.length && (filter === "all" || sec.id === filter || (filter === "protein" && psub.includes(sec.id))));
 
   const bellBtn = h("button", { type: "button", class: "hdr-icon line-icon", "aria-label": "ตั้งเกณฑ์แจ้งเตือน", onClick: () => { st.alertSheet = true; renderSheets(root); } }, pi("bell", 18), h("i", { class: "dot" }));
 

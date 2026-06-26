@@ -15,6 +15,7 @@ import {
   hasSalesData, forecastItem, forecastNext, backtestSeries,
   todayISO, addDaysISO, DOW_SHORT,
 } from "../utils/forecast.js";
+import { getActiveForecastMode, MODE_LABEL } from "../forecast/eventRegimeManager.js";
 
 const bold = (t) => h("b", null, t);
 const fst = { filter: "all", q: "", ctx: null };
@@ -109,7 +110,21 @@ function emptyForecast(go) {
 
 function paint(root) {
   const { go, back } = fst.ctx;
-  const headRight = h("span", { class: "catic helper-ic-violet" }, pi("trend", 18));
+  const headRight = h("button", { type: "button", class: "hdr-icon", "aria-label": "ตั้งค่าพยากรณ์", onClick: () => go({ name: "forecastsettings" }) }, pi("settings", 18));
+  // badge โหมดพยากรณ์ปัจจุบัน (regime) — แตะไปหน้าตั้งค่า
+  const fm = getActiveForecastMode(todayISO());
+  const modeTint = { normal: "green", event_ramp: "amber", event_stable: "violet", post_event: "blue", manual_override: "rose" }[fm.mode] || "green";
+  const modeBadge = h("button", { type: "button", class: "card soft-card soft-" + modeTint + " list-press", style: { width: "100%", textAlign: "left", display: "block", padding: "11px 14px" }, onClick: () => go({ name: "forecastsettings" }) },
+    h("div", { class: "rowflex", style: { gap: "9px" } },
+      h("span", { class: "catic " + modeTint }, pi("trend", 16)),
+      h("div", { style: { flex: 1, minWidth: 0 } },
+        h("div", { class: "overline" }, "โหมดพยากรณ์"),
+        h("div", { style: { fontWeight: 800, fontSize: "14px" } }, MODE_LABEL[fm.mode] || fm.mode),
+        h("div", { style: { fontSize: "11px", color: "var(--muted)", marginTop: "2px", lineHeight: 1.4 } }, fm.reason),
+      ),
+      (() => { const c = pi("settings", 16); c.style.color = "var(--faint)"; return c; })(),
+    ),
+  );
 
   if (!hasSalesData()) {
     root.replaceChildren(
@@ -120,11 +135,13 @@ function paint(root) {
   }
 
   const FC_CATS = cats().filter((c) => ["protein", "egg", "drink"].includes(c.id));
+  const _pc = FC_CATS.find((c) => c.id === "protein");
+  const _proteinSubIds = _pc && _pc.subs ? _pc.subs.map((s) => s.id) : [];
   const q = fst.q.toLowerCase();
   const matchQ = (it) => !q || it.name.toLowerCase().includes(q);
   const sections = sectionsFor(FC_CATS)
     .map((s) => ({ ...s, items: s.items.filter(matchQ) }))
-    .filter((s) => s.items.length && (fst.filter === "all" || s.id === fst.filter));
+    .filter((s) => s.items.length && (fst.filter === "all" || s.id === fst.filter || (fst.filter === "protein" && _proteinSubIds.includes(s.id))));
 
   // แถบรวมต่อวัน (ผลรวมช่วงพยากรณ์ของอาหารทุกเมนู)
   const base = todayISO();
@@ -148,6 +165,7 @@ function paint(root) {
   root.replaceChildren(
     hdr({ title: "พยากรณ์ยอดขาย", sub: "คาดการณ์ล่วงหน้า 7 วัน · อิงข้อมูลนับสต๊อกจริง", onBack: back, right: headRight }),
     h("div", { class: "page stack" },
+      modeBadge,
       h("div", { class: "overline" }, "รวมอาหารต่อวัน · ช่วงคาดการณ์"),
       h("div", { class: "fc7-daystrip" },
         dayTotals.map((d) => h("div", { class: "fc7-dt" },

@@ -338,7 +338,7 @@ function renderSheets(root) {
 
 function editBody(root) {
   const e = st.edit;
-  const nameIn = h("input", { type: "text", class: "input", value: e.name, placeholder: "เช่น กระเพราหมู" });
+  const nameIn = h("input", { type: "text", class: "input", value: e.name, placeholder: "เช่น กะเพราหมู" });
   const unitIn = h("input", { type: "text", class: "input", value: e.unit || "", placeholder: "kg / ฟอง / แพ็ค" });
   const costIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: e.cost || "", placeholder: "0" });
   const saveBtn = h("button", { type: "button", class: "btn btn-primary btn-block", disabled: !e.name, style: { opacity: e.name ? 1 : 0.45 }, onClick: () => { if (st.edit.name) saveEdit(root); } }, pi("check", 16), "บันทึก");

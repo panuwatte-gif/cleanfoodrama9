@@ -14,10 +14,13 @@
 //   [ขั้น 4] จูน λ อัตโนมัติ (walk-forward): ลอง 0.5..0.9 เลือก MAPE ต่ำสุด
 // ============================================================
 
-import { countsRows, items } from "../data/store.js";
+import { countsRows, items, salesRows } from "../data/store.js";
 
 const DAY = 86400000;
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// หน่วยของรายการเป็น kg (ชั่งน้ำหนัก) หรือไม่ — ใช้ตัดสินการปัดเศษพยากรณ์
+//   kg → ทศนิยมได้ (0.1) · หน่วยอื่น (ขวด/ฟอง/ซอง/แผง…) = นับเป็นชิ้น → จำนวนเต็มเสมอ
+const isKgUnit = (itemId) => { const it = (items() || []).find((x) => x.id === itemId); return !!(it && (it.unit === "kg" || it.unit === "g")); };
 const toDate = (iso) => new Date(iso + "T00:00:00");
 const isoOf = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 export const todayISO = () => isoOf(new Date());
@@ -31,30 +34,47 @@ const LAMBDAS = [0.5, 0.6, 0.7, 0.8, 0.9];
 const WINDOW_DAYS = 112;          // 16 สัปดาห์ = 4 เดือน
 const COLD_MAPE = 0.4;            // ช่วงกว้างตอนข้อมูลน้อย (ยังประเมิน MAPE ไม่ได้)
 
-// มีข้อมูลการนับให้คำนวณไหม (ไว้ตัดสิน empty state)
+// มีข้อมูลให้คำนวณไหม (ไว้ตัดสิน empty state) — ยอดขายตรง หรือ ผลต่างการนับ
 export function hasSalesData() {
-  return countsRows().some((r) => r.qty != null);
+  return salesRows().some((r) => r.sold != null) || countsRows().some((r) => r.qty != null);
 }
 
 // ---- [ขั้น 1] อนุมานยอดขายรายวันต่อรายการ (เฉพาะวันที่คำนวณได้) ----
-// คืน [{date, dow, sales, prev, recv, waste, count}] เรียงเก่า→ใหม่
+// รวม 2 แหล่ง: (A) ledger ยอดขายตรง (salesRows — จากชีตพนักงาน/บันทึกในแอป) = ตัวจริง
+//              (B) อนุมานจากผลต่างการนับสต๊อก 2 วันติดกัน — เติมเฉพาะวันที่ (A) ยังไม่มี
+// คืน [{date, dow, sales, prev, recv, waste, count, direct}] เรียงเก่า→ใหม่
 export function inferDailySales(itemId, { windowDays = WINDOW_DAYS, asOf = todayISO() } = {}) {
-  const byDate = {};
-  for (const r of countsRows()) if (r.item === itemId && r.qty != null) byDate[r.date] = r;
   const cutoff = addDaysISO(asOf, -windowDays);
-  const out = [];
-  for (const date of Object.keys(byDate).sort()) {
+  // แผนที่ recv/waste จาก ledger การนับ (ไว้เติมข้อมูลให้แถวยอดขายตรง)
+  const cByDate = {};
+  for (const r of countsRows()) if (r.item === itemId) cByDate[r.date] = r;
+
+  const byDate = {};
+  // (A) ยอดขายตรง — ground truth
+  for (const r of salesRows()) {
+    if (r.item !== itemId || r.sold == null) continue;
+    if (r.date < cutoff || r.date > asOf) continue;
+    const c = cByDate[r.date];
+    byDate[r.date] = {
+      date: r.date, dow: dowOf(r.date), sales: r2(r.sold),
+      prev: null, recv: r2((c && c.recv) || 0), waste: r2((c && c.waste) || 0), count: c ? r2(c.qty) : null,
+      direct: true,
+    };
+  }
+  // (B) อนุมานจากการนับ 2 วันติดกัน — เติมเฉพาะวันที่ยังไม่มียอดขายตรง
+  for (const date of Object.keys(cByDate).sort()) {
     if (date < cutoff || date > asOf) continue;
-    const pr = byDate[prevISO(date)];
-    if (!pr || pr.qty == null) continue;          // วันก่อนหน้าไม่ได้นับ → ข้าม
-    const cur = byDate[date];
+    if (byDate[date] || cByDate[date].qty == null) continue;
+    const pr = cByDate[prevISO(date)];
+    if (!pr || pr.qty == null) continue;            // วันก่อนหน้าไม่ได้นับ → ข้าม
+    const cur = cByDate[date];
     const recv = Number(cur.recv) || 0;
     const waste = Number(cur.waste) || 0;
     let sales = (Number(pr.qty) || 0) + recv - waste - (Number(cur.qty) || 0);
-    if (sales < 0) sales = 0;                      // กันค่าติดลบจากความคลาดเคลื่อนการนับ
-    out.push({ date, dow: dowOf(date), sales: r2(sales), prev: r2(pr.qty), recv: r2(recv), waste: r2(waste), count: r2(cur.qty) });
+    if (sales < 0) sales = 0;
+    byDate[date] = { date, dow: dowOf(date), sales: r2(sales), prev: r2(pr.qty), recv: r2(recv), waste: r2(waste), count: r2(cur.qty), direct: false };
   }
-  return out;
+  return Object.keys(byDate).sort().map((d) => byDate[d]);
 }
 
 // weighted average ของชุด (เรียงเก่า→ใหม่) · ตัวล่าสุด k=0
@@ -116,10 +136,15 @@ export function forecastItem(itemId, targetISO, opts = {}) {
 
   const mape = tunedMape;                          // จาก backtest วันเดียวกัน
   const band = (mape != null) ? mape : COLD_MAPE;
+  // ปัดเศษตามหน่วย: kg = ทศนิยม · นับเป็นชิ้น (ขวด/ฟอง/ซอง/แผง) = จำนวนเต็ม
+  //   low ปัดลง (floor) · high ปัดขึ้น (ceil) → ช่วงครอบคลุมจริง · ค่าสูงสุดไม่เป็นทศนิยม
+  const kg = isKgUnit(itemId);
+  const loRaw = Math.max(0, predicted * (1 - band));
+  const hiRaw = predicted * (1 + band);
   return {
-    predicted: r2(predicted),
-    low: r2(Math.max(0, predicted * (1 - band))),
-    high: r2(predicted * (1 + band)),
+    predicted: kg ? r2(predicted) : Math.round(predicted),
+    low: kg ? r2(loRaw) : Math.floor(loRaw),
+    high: kg ? r2(hiRaw) : Math.ceil(hiRaw),
     mape: mape != null ? r2(mape) : null,
     bandPct: r2(band * 100),
     n, lambda, overallAvg: r2(overallAvg), method,

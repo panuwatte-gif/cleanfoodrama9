@@ -7,22 +7,26 @@
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { hdr, note, qtyInput, emptyState, dateBar } from "../components/components.js";
+import { hdr, note, qtyInput, emptyState, dateBarFull } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { fmt } from "../utils/formulas.js";
-import { GP_PCT, TODAY } from "../data/seed.js";
-import { incomeRows, saveIncomeRecord } from "../data/store.js";
+import { GP_PCT } from "../data/seed.js";
+import { incomeRows, saveIncomeRecord, assumeShop } from "../data/store.js";
+import { todayIso, thaiShort, recDate, parseIso } from "../utils/dateutil.js";
+
+// ช่องทาง → id ของค่า GP ใน assumption (แยกร้าน) — แก้ได้ที่ ปรับค่า assumption → รายได้
+const CH_GP_ID = { Grab: "gp-grab", Lineman: "gp-lineman", Shopee: "gp-shopee" };
 
 // ช่องทางรายได้ (ตรงกับคีย์ GP_PCT) — รายการคงที่ ไม่ใช่ตัวเลขเดโม
 const CHANNELS = ["Grab", "Lineman", "Shopee", "หน้าร้าน", "อื่นๆ"];
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
-const ist = { day: TODAY.d, ch: "Grab", gross: "", gp: "", mkt: "", ctx: null };
+const ist = { iso: null, ch: "Grab", gross: "", gp: "", mkt: "", ctx: null };
 
 export function incomeScreen(ctx) {
   ist.ctx = ctx;
-  ist.day = ctx.day || TODAY.d;
+  ist.iso = ctx.date || todayIso();
   ist.ch = "Grab";
   loadExisting();
   const root = h("div", { class: "page-wrap", style: { display: "flex", flexDirection: "column", flex: 1 } });
@@ -30,17 +34,17 @@ export function incomeScreen(ctx) {
   return root;
 }
 
-// id ของบันทึก = วัน+ช่องทาง (เดือนเดียว) — บันทึกซ้ำวัน/ช่องทางเดิม = แก้ทับ
-function recId(day, ch) { return "inc-" + day + "-" + ch; }
+// id ของบันทึก = วันที่เต็ม+ช่องทาง (inc-2026-06-01-Grab) — ไม่ชนกันข้ามเดือน · บันทึกซ้ำ = แก้ทับ
+function recId(iso, ch) { return "inc-" + iso + "-" + ch; }
 // รวมรายการรายได้จริงของวัน (จากที่บันทึกจริงเท่านั้น — ไม่มี seed ปลอม)
-function mergedDay(day) {
+function mergedDay(iso) {
   const out = {};
-  for (const r of incomeRows()) if (r.day === day) out[r.ch] = { gross: r.gross, gp: r.gp || 0, mkt: r.mkt || 0, stored: true };
+  for (const r of incomeRows()) if (recDate(r) === iso) out[r.ch] = { gross: r.gross, gp: r.gp || 0, mkt: r.mkt || 0, stored: true };
   return out;
 }
 
 function loadExisting() {
-  const ex = mergedDay(ist.day)[ist.ch];
+  const ex = mergedDay(ist.iso)[ist.ch];
   ist.gross = ex ? String(ex.gross) : "";
   ist.gp = ex && ex.gp != null ? String(ex.gp) : "";
   ist.mkt = ex ? String(ex.mkt) : "";
@@ -55,9 +59,13 @@ function lnRow(l, v, c, { bold: b, indent } = {}) {
 
 function paint(root) {
   const { back, toast, shopCtx } = ist.ctx;
-  const dayLog = mergedDay(ist.day);
+  const dayLabel = thaiShort(ist.iso);
+  const dayLog = mergedDay(ist.iso);
   const existing = dayLog[ist.ch];
-  const gpPct = GP_PCT[ist.ch] ?? 0;
+  // GP% ดึงจากค่า assumption ของ "ร้านที่เลือกอยู่" (แก้ที่หน้าปรับค่า → มีผลที่นี่จริง) · ไม่มี → ใช้ค่าตั้งต้น
+const shopName = (shopCtx && shopCtx.shop) || "";
+  const gid = CH_GP_ID[ist.ch];
+  const gpPct = gid ? assumeShop(gid, shopName, (GP_PCT[ist.ch] || 0) * 100) / 100 : 0;
 
   // --- live derived nodes ---
   const cutVal = h("span", { class: "cut-line-val tnum", style: { fontWeight: 600, fontSize: "13px" } });
@@ -99,8 +107,8 @@ function paint(root) {
   }, dayLog[c] && pi("check", 12), c));
 
   const noteEl = existing
-    ? note([bold("วันที่ " + ist.day + " มิ.ย. บันทึก " + ist.ch + " ไว้แล้ว"), " (฿" + fmt(existing.gross) + ") — ฟอร์มดึงค่าเดิมมาให้ กดบันทึก = ", bold("แก้ทับ"), " ไม่บันทึกซ้ำ · เก็บ audit ว่าใครแก้"], { amber: true })
-    : note("ยังไม่มีรายการ " + ist.ch + " ของวันที่ " + ist.day + " มิ.ย. — กรอกใหม่ได้เลย ระบบกันคีย์ซ้ำให้");
+    ? note([bold("วันที่ " + dayLabel + " บันทึก " + ist.ch + " ไว้แล้ว"), " (฿" + fmt(existing.gross) + ") — ฟอร์มดึงค่าเดิมมาให้ กดบันทึก = ", bold("แก้ทับ"), " ไม่บันทึกซ้ำ · เก็บ audit ว่าใครแก้"], { amber: true })
+    : note("ยังไม่มีรายการ " + ist.ch + " ของวันที่ " + dayLabel + " — กรอกใหม่ได้เลย ระบบกันคีย์ซ้ำให้");
 
   // breakdown card
   const cutLine = h("div", { class: "split", style: { padding: "3px 0" } },
@@ -152,21 +160,21 @@ function paint(root) {
   footBtn.addEventListener("click", () => {
     const g = num(ist.gross), gpv = num(ist.gp), mk = num(ist.mkt);
     const net = g - (gpv + mk);
-    saveIncomeRecord({ id: recId(ist.day, ist.ch), day: ist.day, ch: ist.ch, gross: g, gp: gpv, mkt: mk, net, at: new Date().toISOString() });
-    toast((existing ? "แก้ไข" : "บันทึก") + "รายได้ " + ist.ch + " · " + ist.day + " มิ.ย. ฿" + fmt(net) + " — บันทึกขึ้นคลาวด์แล้ว");
+    saveIncomeRecord({ id: recId(ist.iso, ist.ch), date: ist.iso, day: parseIso(ist.iso).d, ch: ist.ch, shop: (ist.ctx.shopCtx && ist.ctx.shopCtx.shop) || undefined, gross: g, gp: gpv, mkt: mk, net, at: new Date().toISOString() });
+    toast((existing ? "แก้ไข" : "บันทึก") + "รายได้ " + ist.ch + " · " + dayLabel + " ฿" + fmt(net) + " — บันทึกขึ้นคลาวด์แล้ว");
     back();
   });
 
   root.replaceChildren(
     hdr({ title: "บันทึกรายได้", sub: "เลือกวัน · เลือกช่องทาง · แก้ย้อนหลังได้", onBack: back, right: storeChip(shopCtx) }),
     h("div", { class: "page stack", style: { paddingBottom: "12px" } },
-      dateBar({ day: ist.day, onChange: (d) => { ist.day = d; loadExisting(); paint(root); } }),
+      dateBarFull({ iso: ist.iso, onChange: (iso) => { ist.iso = iso; loadExisting(); paint(root); } }),
       h("div", { class: "chip-tabs" }, chips),
       noteEl,
       breakdown,
       note([bold("หักเงิน GP + Marketing ใส่เอง"), " — กรอกตามจริงที่แต่ละแพลตฟอร์มหักจริง (มีปุ่มช่วยคิด GP% ให้ แต่แก้ทับได้)"]),
       note([bold("GP ต้องบวก VAT 7% เสมอ"), " — Grab/แพลตฟอร์มคิด GP บวก VAT 7% เช่น 30% → 30+(30×7%) = ", bold("32.1%"), " · ", bold("ถ้าร้านจด VAT"), " เอา 7% นี้ไปขอคืน/หักได้ · ", bold("ถ้าไม่จด"), " ต้องจ่ายเองเต็ม"], { amber: true }),
-      h("div", { class: "overline" }, "บันทึกแล้ว · วันที่ " + ist.day + " มิ.ย."),
+      h("div", { class: "overline" }, "บันทึกแล้ว · วันที่ " + dayLabel),
       h("div", { class: "card", style: { padding: "4px 16px" } }, ...savedRows),
     ),
     h("div", { class: "foot" },

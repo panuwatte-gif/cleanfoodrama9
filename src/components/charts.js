@@ -172,7 +172,52 @@ export function barChart(data, { h = 118, color = "#54AE7B" } = {}) {
   return svg;
 }
 
-export function branchCombo({ days, branches, h = 168, fmt = (x) => x } = {}) {
+/* ---------- เส้นสะสม 3 เส้น: รายรับสะสม + รายจ่ายสะสม + กำไรสะสม (แกนขวา = บาท สะสม)
+   + แท่งรายได้รายวัน (แกนซ้าย คนละสเกล) → เส้นสะสมไม่แบนเพราะตัวเลขต่างกันมาก ----------
+   daily = [{ d, in, ex }] (in = รายได้/วัน · ex = รายจ่าย/วัน) */
+export function cumLinesChart({ daily, h = 192, showBars = true } = {}) {
+  const W = 336, H = h, padL = 6, padR = 36, padB = 20, padT = 22;
+  const n = daily.length || 1;
+  let ai = 0, ae = 0;
+  const cum = daily.map((d) => { ai += (d.in || 0); ae += (d.ex || 0); return { d: d.d, in: d.in || 0, cin: ai, cex: ae, cpf: ai - ae }; });
+  const innerW = W - padL - padR;
+  const x = (i) => padL + (n <= 1 ? innerW / 2 : (i * innerW) / (n - 1));
+  // แกนขวา: ยอดสะสม (ครอบกำไรที่อาจติดลบด้วย)
+  const cmax = Math.max(...cum.map((c) => c.cin), 1);
+  const cmin = Math.min(0, ...cum.map((c) => c.cpf));
+  const step = niceCeil((cmax - cmin) / 3) || 1;
+  const top = Math.ceil(cmax / step) * step;
+  const bot = Math.floor(cmin / step) * step;
+  const span = (top - bot) || 1;
+  const yR = (v) => padT + (1 - (v - bot) / span) * (H - padT - padB);
+  // แกนซ้าย: รายได้/วัน (แท่ง)
+  const dmax = Math.max(...daily.map((d) => d.in || 0), 1) * 1.2;
+  const base = H - padB;
+  const yL = (v) => padT + (1 - v / dmax) * (H - padT - padB);
+
+  const svg = svgEl("svg", { class: "combo cumlines", viewBox: `0 0 ${W} ${H}` });
+  svg.style.height = H + "px";
+  for (let g = bot; g <= top + 1e-6; g += step) {
+    const gy = yR(g);
+    svg.appendChild(svgEl("line", { class: Math.abs(g) < 1e-6 ? "axis" : "grid-r", x1: padL, y1: gy, x2: W - padR, y2: gy }));
+    const lb = svgEl("text", { class: "tick-r", x: W - padR + 4, y: gy + 3 }); lb.textContent = kLabel(g); svg.appendChild(lb);
+  }
+  if (showBars) {
+    const bw = Math.max(3.5, Math.min(13, innerW / n / 1.5));
+    cum.forEach((c, i) => { const yt = yL(c.in); svg.appendChild(svgEl("rect", { class: "cl-bar", x: (x(i) - bw / 2).toFixed(1), y: yt.toFixed(1), width: bw.toFixed(1), height: Math.max(0.6, base - yt).toFixed(1), rx: 2 })); });
+  }
+  cum.forEach((c, i) => { if (i % 2 === 0 || i === n - 1) { const t = svgEl("text", { class: "axis-lbl", x: x(i), y: H - 6, "text-anchor": "middle" }); t.textContent = c.d; svg.appendChild(t); } });
+  const lineOf = (key) => cum.map((c, i) => [x(i), yR(c[key])]);
+  const pathOf = (pts) => pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const inPts = lineOf("cin"), exPts = lineOf("cex"), pfPts = lineOf("cpf");
+  svg.appendChild(svgEl("path", { class: "cl-ex", d: pathOf(exPts) }));
+  svg.appendChild(svgEl("path", { class: "cl-pf", d: pathOf(pfPts) }));
+  svg.appendChild(svgEl("path", { class: "cl-in", d: pathOf(inPts) }));
+  [["cl-dot-ex", exPts], ["cl-dot-pf", pfPts], ["cl-dot-in", inPts]].forEach(([cls, pts]) => { const p = pts[n - 1]; svg.appendChild(svgEl("circle", { class: cls, cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: 3.4 })); });
+  return svg;
+}
+
+export function branchCombo({ days, branches, h = 168, fmt = (x) => x, cycleColors = null, lineColor = null } = {}) {
   const W = 332, H = h, padL = 6, padR = 33, padB = 19, padT = 22;
   const n = days.length;
   const dailyMax = Math.max(...days.map((d) => d.total), 1) * 1.18;
@@ -200,21 +245,35 @@ export function branchCombo({ days, branches, h = 168, fmt = (x) => x } = {}) {
   }
 
   // แท่งซ้อนรายวัน (แต่ละชั้น = หนึ่งสาขา) · วันพยากรณ์ = โปร่งใส
+  // cycleColors → มีช่องทางเดียว (ร้านเดียว): ระบายสีพาสเทลสลับกันต่อวัน (ไม่จำเจาะเขียว)
   days.forEach((d, i) => {
     const cx = x(i);
-    let running = 0;
-    branches.forEach((b, bi) => {
-      const v = d.byBranch[b.name] || 0;
-      if (v <= 0) return;
-      const yTop = yL(running + v), yBot = yL(running);
-      svg.appendChild(svgEl("rect", {
-        class: "bc-seg", x: (cx - bw / 2).toFixed(1), y: yTop.toFixed(1),
-        width: bw.toFixed(1), height: Math.max(0.6, yBot - yTop).toFixed(1),
-        rx: bi === branches.length - 1 ? 2.5 : 0, fill: b.color,
-        "fill-opacity": d.actual === false ? 0.32 : 1,
-      }));
-      running += v;
-    });
+    if (cycleColors) {
+      const v = d.total || 0;
+      if (v > 0) {
+        const yTop = yL(v);
+        svg.appendChild(svgEl("rect", {
+          class: "bc-seg", x: (cx - bw / 2).toFixed(1), y: yTop.toFixed(1),
+          width: bw.toFixed(1), height: Math.max(0.6, base - yTop).toFixed(1),
+          rx: 3, fill: cycleColors[i % cycleColors.length],
+          "fill-opacity": d.actual === false ? 0.32 : 1,
+        }));
+      }
+    } else {
+      let running = 0;
+      branches.forEach((b, bi) => {
+        const v = d.byBranch[b.name] || 0;
+        if (v <= 0) return;
+        const yTop = yL(running + v), yBot = yL(running);
+        svg.appendChild(svgEl("rect", {
+          class: "bc-seg", x: (cx - bw / 2).toFixed(1), y: yTop.toFixed(1),
+          width: bw.toFixed(1), height: Math.max(0.6, yBot - yTop).toFixed(1),
+          rx: bi === branches.length - 1 ? 2.5 : 0, fill: b.color,
+          "fill-opacity": d.actual === false ? 0.32 : 1,
+        }));
+        running += v;
+      });
+    }
     if (i % 2 === 0 || i === n - 1) {
       const t = svgEl("text", { class: "axis-lbl", x: cx, y: H - 6, "text-anchor": "middle" });
       t.textContent = d.d;
@@ -222,14 +281,14 @@ export function branchCombo({ days, branches, h = 168, fmt = (x) => x } = {}) {
     }
   });
 
-  // เส้นยอดสะสม (แกนขวา) + จุดขาวทุกจุด
+  // เส้นยอดสะสม (แกนขวา) + จุดทุกจุด
   const cumPts = cum.map((v, i) => [x(i), yR(v)]);
   const cumLine = cumPts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
-  svg.appendChild(svgEl("path", { class: "cum-line", d: cumLine }));
-  cumPts.forEach((p) => svg.appendChild(svgEl("circle", { class: "cum-dot", cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: 2.8 })));
+  svg.appendChild(svgEl("path", { class: "cum-line", d: cumLine, stroke: lineColor || null }));
+  cumPts.forEach((p) => svg.appendChild(svgEl("circle", { class: "cum-dot", cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: 2.8, fill: lineColor || null })));
 
   // ป้ายชื่อแกน (บนซ้าย) + ยอดสะสมจริงที่ปลายเส้น (บนขวา)
-  const legDot = svgEl("circle", { class: "cum-dot", cx: padL + 3, cy: padT - 12, r: 3 });
+  const legDot = svgEl("circle", { class: "cum-dot", cx: padL + 3, cy: padT - 12, r: 3, fill: lineColor || null });
   svg.appendChild(legDot);
   const legTx = svgEl("text", { class: "combo-cap", x: padL + 10, y: padT - 9 });
   legTx.textContent = "ยอดสะสม";

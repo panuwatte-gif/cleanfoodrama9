@@ -11,7 +11,7 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, tag } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
-import { cats, menus, priceRows, items } from "../data/store.js";
+import { cats, menus, priceRows, items, alertOnOf } from "../data/store.js";
 import { catEmoji, stockOf } from "../utils/formulas.js";
 
 const bold = (t) => h("b", null, t);
@@ -38,6 +38,7 @@ function linkCard(root, { iconName, tintCls = "green", title, sub, soft, onClick
 export function dataScreen(ctx) {
   const { go, role, shopCtx } = ctx;
   const low = (items() || []).filter((it) => it.isActive !== false && stockOf(it.id).st !== "ok").length;
+  const alertOn = (items() || []).filter((it) => it.isActive !== false && alertOnOf(it.id)).length;
 
   const catBadges = h("div", { class: "rowflex", style: { flexWrap: "wrap", gap: "6px", marginTop: "11px" } },
     cats().map((c) => {
@@ -57,6 +58,14 @@ export function dataScreen(ctx) {
         right: low ? tag("ต่ำ " + low, { kind: "dgr", iconName: "alert" }) : tag("ปกติ", { kind: "ok" }),
         onClick: () => go({ name: "stocklist" }),
         extra: catBadges,
+      }),
+
+      linkCard(null, {
+        iconName: "bell", tintCls: "blue",
+        title: "ตั้งค่าแจ้งเตือนสต๊อกสินค้า",
+        sub: "เปิด/ปิด + ตั้งเกณฑ์ขั้นต่ำ · แยกหมวด · ทุกรายการ",
+        right: tag(alertOn + " เปิด", { kind: "ok", iconName: "bell" }),
+        onClick: () => go({ name: "alerts" }),
       }),
 
       linkCard(null, {

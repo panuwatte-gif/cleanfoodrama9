@@ -22,7 +22,7 @@
 import * as api from "../api/apiClient.js";
 import {
   initData, bumpData, __adoptRemote,
-  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows, recipesRows, manualRows, payrollRows, incomeRows, expenseRows, songsRows, priceRows, countsRows,
+  cats, items, menus, assumptions, stockRows, nutriMenu, nutriIngr, users, tasksRows, recipesRows, manualRows, payrollRows, incomeRows, expenseRows, songsRows, priceRows, countsRows, salesRows,
 } from "./store.js";
 import { getEditLogs, adoptEditLogs } from "./editlog.js";
 
@@ -42,6 +42,7 @@ const COLLECTIONS = [
   { coll: "songs",       key: "songs",               kind: "array", get: songsRows },
   { coll: "priceList",   key: "priceList",           kind: "array", get: priceRows },
   { coll: "counts",      key: "stockCounts",         kind: "array", get: countsRows },
+  { coll: "salesDaily",  key: "salesDaily",          kind: "array", get: salesRows },
   { coll: "income",      key: "incomeRecords",       kind: "array", get: incomeRows },
   { coll: "expense",     key: "expenseRecords",      kind: "array", get: expenseRows },
   // audit trail lives in its OWN module (editlog.js, no store db) → adopt via callback

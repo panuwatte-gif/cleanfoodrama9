@@ -16,8 +16,8 @@
 
 import { load, save } from "../utils/storage.js";
 import {
-  CATS_SEED, ITEMS_SEED, MENUS_SEED, ASSUMPTIONS_SEED, STOCK_SEED,
-  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED, RECIPES, MANUAL, TODAY, PAYROLL, SONGS,
+  CATS_SEED, ITEMS_SEED, MENUS_SEED, ASSUMPTIONS_SEED, ASSUMP_META, STOCK_SEED,
+  MENU_NUTRI, INGR_NUTRI, USERS_SEED, TASKS_SEED, RECIPES, MANUAL, TODAY, PAYROLL, SONGS, SALES_SEED, PRICE_SEED,
 } from "./seed.js";
 import { logEdit } from "./editlog.js";
 // stockOf อ่านแถวสต๊อกสด (live) เพื่อ seed แถวใหม่ของรายการที่ยังไม่มี
@@ -65,8 +65,9 @@ function fresh() {
     manual: clone(MANUAL),
     payroll: clone(PAYROLL),
     songs: clone(SONGS),
-    priceList: [],
+    priceList: clone(PRICE_SEED),
     counts: [],
+    salesDaily: clone(SALES_SEED),
     income: [],
     expense: [],
   };
@@ -88,15 +89,51 @@ export function initData() {
   // กวาดเพลงเดโม (ไม่มีไฟล์เสียงจริง = ไม่มี url และไม่ใช่ไฟล์ในเครื่อง) ออก — เล่นไม่ได้อยู่แล้ว
   db.songs = (db.songs || []).filter((s) => s && (s.url || s.local));
   if (!db.priceList) db.priceList = [];
+  // เมนู·ราคาขายตั้งต้น — ยังว่าง→ใส่ชุดเมนูจริง (cloud จะทับได้ถ้ามี)
+  if (!db.priceList.length) db.priceList = clone(PRICE_SEED);
   if (!db.counts) db.counts = [];
+  // ยอดขายรายวัน (ledger พยากรณ์) — ถ้ายังว่าง เติมจากชีตพนักงาน (มิ.ย. 2026)
+  if (!db.salesDaily || !db.salesDaily.length) db.salesDaily = clone(SALES_SEED);
   if (!db.income) db.income = [];
   if (!db.expense) db.expense = [];
   // migration: แยกข้าวออกจากชื่อเมนู + ตั้ง rice/riceItem (idempotent)
   db.menus = (db.menus || []).map(migMenu);
+  // migration: กัน "กุ้ง" (และหมวดย่อย/เมนู seed) หายจากข้อมูลเก่าที่บันทึกไว้ก่อนมีกุ้ง
+  //   self-heal แบบ idempotent — เติมเฉพาะที่ "ไม่มี id อยู่เลย" (ของที่ผู้ใช้ตั้งใจลบ = soft-delete ยังมี id → ไม่เด้งกลับ)
+  {
+    const pSeed = CATS_SEED.find((c) => c.id === "protein");
+    const p = (db.cats || []).find((c) => c.id === "protein");
+    if (p && pSeed && pSeed.subs) { p.subs = p.subs || []; pSeed.subs.forEach((sub) => { if (!p.subs.some((s) => s.id === sub.id)) p.subs.push(clone(sub)); }); }
+    ITEMS_SEED.filter((i) => i.sub === "shrimp").forEach((seed) => { if (!(db.items || []).some((i) => i.id === seed.id)) db.items.push(clone(seed)); });
+    MENUS_SEED.filter((m) => /shrimp/.test(m.item || "")).forEach((seed) => { if (!(db.menus || []).some((m) => m.id === seed.id)) db.menus.push(clone(seed)); });
+    save(DATA_KEY, db);
+  }
   // migration เฟส 6: โครงงาน/ข้อความใหม่ (status submitted · due · notice/note)
   // ถ้ายังเป็นชุด seed เก่า (t-seed*) → แทนด้วยชุดเดโมใหม่ทั้งก้อน
   // migration: ลบงานเดโมเก่า (t-s0X / t-seed) — เริ่มจากว่างจริง
   if (db.tasks.some((t) => /^t-s/.test(t.id))) db.tasks = db.tasks.filter((t) => !/^t-s/.test(t.id));
+  // migration (ครั้งเดียว): ลบข้อมูล "เดโม" ที่เคยฝังไว้ — พนักงานตัวอย่าง (payroll pr-1..4)
+  // + โภชนาการตัวอย่าง — เพื่อเริ่มบันทึก "ข้อมูลจริง" · กันไม่ให้เดโมเด้งกลับขึ้นคลาวด์
+  if (!db._cleanDemo1) {
+    db.payroll = (db.payroll || []).filter((p) => !/^pr-[1-9]$/.test(p.id));
+    db.nutriMenu = {};
+    db.nutriIngr = {};
+    db._cleanDemo1 = true;
+    save(DATA_KEY, db);
+  }
+  // sync โครงสร้างค่ามาตรฐาน (grp/name/unit/use/perShop) ของ assumption ทุกครั้งที่โหลด
+  // เป็นข้อมูล "ฝั่งโค้ด" ไม่ใช่ค่าที่ผู้ใช้ตั้ง → sync ได้เสมอ (กัน flag ค้างจาก cache เก่า)
+  // ค่า v / byShop (แยกร้าน) / ค่าที่เพิ่มเอง (custom) ไม่ถูกแตะ
+  {
+    const cur = db.assumptions || (db.assumptions = []);
+    ASSUMPTIONS_SEED.forEach((seed) => {
+      const ex = cur.find((a) => a.id === seed.id);
+      if (!ex) { cur.push(clone(seed)); return; }
+      ex.grp = seed.grp; ex.name = seed.name; ex.unit = seed.unit;
+      ex.use = seed.use; ex.perShop = seed.perShop || false;
+    });
+    save(DATA_KEY, db);
+  }
   return db;
 }
 
@@ -111,7 +148,17 @@ export function __adoptRemote(coll, value) {
   const d = initData();
   if (value != null) {
     if (coll === "menus" && Array.isArray(value)) value = value.map(migMenu);
-    d[coll] = value; saveDb();
+    d[coll] = value;
+    // กัน "กุ้ง" หาย: ถ้าคลาวด์ส่ง cats/items มาแบบไม่มีกุ้ง → เติมจาก seed (idempotent)
+    if (coll === "cats" && Array.isArray(value)) {
+      const pSeed = CATS_SEED.find((c) => c.id === "protein");
+      const p = value.find((c) => c.id === "protein");
+      if (p && pSeed && pSeed.subs) { p.subs = p.subs || []; pSeed.subs.forEach((sub) => { if (!p.subs.some((s) => s.id === sub.id)) p.subs.push(clone(sub)); }); }
+    }
+    if (coll === "items" && Array.isArray(value)) {
+      ITEMS_SEED.filter((i) => i.sub === "shrimp").forEach((seed) => { if (!value.some((i) => i.id === seed.id)) value.push(clone(seed)); });
+    }
+    saveDb();
   }
 }
 
@@ -141,6 +188,8 @@ export function manualRows() { return initData().manual; }
 export function payrollRows() { return initData().payroll; }
 export function songsRows() { return initData().songs; }
 export function priceRows() { return initData().priceList; }
+// ยอดขายรายวันต่อรายการ (ledger) — ต้นทางพยากรณ์/อันดับ · 1 แถว = วัน+รายการ (sold)
+export function salesRows() { return initData().salesDaily; }
 // บันทึกการนับสต๊อกรายวัน (ledger) — ต้นทางของพยากรณ์ · 1 แถว = วันที่+รายการ
 export function countsRows() { return initData().counts; }
 export function incomeRows() { return initData().income; }
@@ -405,6 +454,19 @@ export async function setStockThreshold(id, v) {
   return clone(row);
 }
 
+// เปิด/ปิดแจ้งเตือนของต่ำรายตัว (default = เปิด) — ปิดแล้วบอทไม่เตือนรายการนี้
+export async function setStockAlert(id, on) {
+  const row = ensureStockRow(id);
+  row.alertOn = !!on;
+  persist(); bumpData();
+  return clone(row);
+}
+// อ่านสถานะแจ้งเตือนรายตัว (ไม่เคยตั้ง = เปิด)
+export function alertOnOf(id) {
+  const row = stockRows().find((s) => s.id === id);
+  return !(row && row.alertOn === false);
+}
+
 // ---- ล็อต FIFO รายตัว (เพิ่ม/แก้/ลบ) — qty รวมคิดใหม่จากผลรวมล็อตเสมอ ----
 const _sumLots = (row) => _r2((row.lots || []).reduce((a, l) => a + (Number(l.qty) || 0), 0));
 
@@ -472,6 +534,16 @@ export async function saveRecipe(rec) {
 export async function removeRecipe(id) {
   const d = initData();
   d.recipes = recipesRows().filter((r) => r.id !== id);
+  persist(); bumpData();
+  return true;
+}
+// เลื่อนสูตรขึ้น/ลง (dir = -1 ขึ้น · +1 ลง) — ลำดับนี้ใช้ทุกหน้า (หน้าแรก + หน้าแก้สูตร อ่านชุดเดียวกัน)
+export async function moveRecipe(id, dir) {
+  const list = recipesRows();
+  const i = list.findIndex((r) => r.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return false;
+  const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
   persist(); bumpData();
   return true;
 }
@@ -568,6 +640,25 @@ export async function removePrice(id) {
   return true;
 }
 
+// ---- ยอดขายรายวันต่อรายการ (sales ledger) — ป้อนพยากรณ์ · upsert ตาม id (วัน|รายการ) ----
+export async function getSalesDaily() { return clone(salesRows()); }
+export async function saveSalesRow(date, itemId, sold) {
+  const d = initData();
+  const id = date + "|" + itemId;
+  const n = Math.round((Number(sold) || 0) * 1000) / 1000;
+  const i = d.salesDaily.findIndex((x) => x.id === id);
+  if (i >= 0) d.salesDaily[i] = { ...d.salesDaily[i], sold: n };
+  else d.salesDaily.push({ id, date, item: itemId, sold: n });
+  persist(); bumpData();
+  return true;
+}
+export async function removeSalesRow(id) {
+  const d = initData();
+  d.salesDaily = salesRows().filter((r) => r.id !== id);
+  persist(); bumpData();
+  return true;
+}
+
 // ---- reset (เผื่อเมนู "ล้างข้อมูลเดโม") ----
 export async function resetData() { db = fresh(); persist(); bumpData(); return true; }
 
@@ -575,5 +666,16 @@ export async function resetData() { db = fresh(); persist(); bumpData(); return 
 export function assume(id, fallback = 0) {
   const a = assumptions().find((x) => x.id === id);
   const n = a ? parseFloat(a.v) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// อ่านค่า assumption แบบ "แยกร้าน" — ถ้า assumption ตั้ง perShop และร้านนี้มีค่าเฉพาะ
+// (byShop[shop]) ใช้ค่านั้น ไม่งั้น fall back ค่ากลาง (a.v) แล้วค่อย fallback ที่ส่งมา
+export function assumeShop(id, shop, fallback = 0) {
+  const a = assumptions().find((x) => x.id === id);
+  if (!a) return fallback;
+  let raw = a.v;
+  if (a.perShop && a.byShop && shop && a.byShop[shop] != null && a.byShop[shop] !== "") raw = a.byShop[shop];
+  const n = parseFloat(raw);
   return Number.isFinite(n) ? n : fallback;
 }
