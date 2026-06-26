@@ -15,7 +15,7 @@ import { cumLinesChart } from "../components/charts.js";
 import { fmt, itemById, unitOf, stockOf, breakevenPerDay, coverDays, reorderPoint, fmtQty, fmtRate, matchCat } from "../utils/formulas.js";
 import { items, cats, incomeRows, expenseRows, countsRows } from "../data/store.js";
 import { REV_TARGET_YEAR, COST_MODEL, BRANCH_COLORS, EXP_INV_CAT } from "../data/seed.js";
-import { salesRanking, latestDayResults, inferDailySales, DOW_TH } from "../utils/forecast.js";
+import { salesRanking, latestDayResults, inferDailySales, DOW_TH } from "../utils/usage.js";
 import { thaiShort, recDate } from "../utils/dateutil.js";
 
 const bold = (t) => h("b", null, t);
@@ -119,7 +119,6 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
   const dailyRows = [
     { ic: "chat", t: "ส่งเข้ากลุ่ม LINE", s: "เลือกหัวข้อที่จะส่ง · ระบบแต่งข้อความให้", tag: tag("รอส่ง", { kind: "warn" }), r: "linesend" },
     { ic: "history", t: "ประวัติ + แก้ย้อนหลัง", s: "ทุกการบันทึก · audit log ลบไม่ได้", r: "history" },
-    { ic: "scale", t: "ความแม่นพยากรณ์ (back-test)", s: "เทียบทาย vs จริง · อัปเดตตามข้อมูลนับ", r: "fchistory" },
   ].map((x) => {
     const chevEl = (() => { const c = pi("chev", 16); c.style.color = "var(--faint)"; return c; })();
     return h("button", { type: "button", class: "rowflex list-press", style: { width: "100%", border: 0, background: "transparent", textAlign: "left", padding: "12px 2px", borderBottom: "1px solid var(--border-soft)" }, onClick: () => go({ name: x.r }) },

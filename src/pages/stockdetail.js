@@ -9,7 +9,7 @@ import { pi } from "../components/icons.js";
 import { tag, meter, hdr, qtyInput, note } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
 import { itemById, catById, subById, unitOf, fmt, stockOf } from "../utils/formulas.js";
-import { inferDailySales } from "../utils/forecast.js";
+import { inferDailySales } from "../utils/usage.js";
 import { addLot, editLot, removeLot } from "../data/store.js";
 
 const sdt = { id: null, ctx: null, sheet: null, val: "" };

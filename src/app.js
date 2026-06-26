@@ -45,7 +45,7 @@ import { unitConvertScreen } from "./pages/unitconvert.js";
 import { moneyScreen } from "./pages/money.js";
 import { incomeScreen } from "./pages/income.js";
 import { expenseScreen } from "./pages/expense.js";
-import { forecastScreen, fcHistoryScreen } from "./pages/forecast.js";
+import { forecastScreen } from "./pages/forecast.js";
 import { taxScreen } from "./pages/tax.js";
 import { execSummaryScreen } from "./pages/execsummary.js";
 import { orderExpenseScreen } from "./pages/orderexpense.js";
@@ -61,6 +61,7 @@ import { exportScreen } from "./pages/export.js";
 import "./lib/image-slot.js"; // ลงทะเบียน <image-slot> + window.kkSlots
 import { initImageSync } from "./lib/image-sync.js"; // เชื่อมรูป ↔ Supabase Storage
 import { initGestures } from "./lib/gestures.js"; // ลากเลื่อนแท็บ (PC) + ปัดขอบจอ back/forward
+import { recordTodayRuns } from "./forecast/forecastRuns.js"; // เริ่มเก็บ forecast ก่อนเห็นจริง (backtest)
 
 // ---- เปลือกสถานะแอป (single source สำหรับ navigation) ----
 const S = {
@@ -194,7 +195,6 @@ function renderContent() {
       case "expense":       return expenseScreen({ ...sctx, date: r.date });
       case "forecast":      return forecastScreen(sctx);
       case "forecastsettings": return forecastSettingsScreen(sctx);
-      case "fchistory":     return fcHistoryScreen({ ...sctx, id: r.id });
       case "tax":           return taxScreen(sctx);
       case "execsummary":   return execSummaryScreen(sctx);
       case "orderexpense":  return orderExpenseScreen(sctx);
@@ -307,6 +307,8 @@ function boot() {
   // bumpData() ให้ทุกหน้าวาดใหม่ · ออฟไลน์ → คงใช้ข้อมูลในเครื่อง
   hydrateData();
   try { initImageSync(); } catch (_) {}
+  // เก็บ forecast ของวันนี้ไว้ก่อนเห็น actual (วันละครั้ง) — สำหรับ backtest/error ภายหลัง
+  try { recordTodayRuns(); } catch (_) {}
   // อัปเดตแถบสถานะเมื่อ online/offline สลับ (ไม่ rerender ทั้งหน้า กัน focus หลุด)
   onBackendStatus(() => {
     const strip = document.querySelector(".demo-strip");
