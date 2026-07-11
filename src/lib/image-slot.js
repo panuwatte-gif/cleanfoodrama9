@@ -261,7 +261,7 @@
         '  <img part="image" alt="" draggable="false" style="display:none">' +
         '  <div class="empty" part="empty">' + icon +
         '    <div class="cap"></div>' +
-        '    <div class="sub">or <u>browse files</u></div></div>' +
+        '    <div class="sub">หรือ <u>แตะเลือกไฟล์</u></div></div>' +
         '  <div class="ring" part="ring"></div>' +
         '</div>' +
         '<div class="spill">' +
@@ -269,8 +269,8 @@
         '  <div class="handle" data-c="nw"></div><div class="handle" data-c="ne"></div>' +
         '  <div class="handle" data-c="sw"></div><div class="handle" data-c="se"></div>' +
         '</div>' +
-        '<div class="ctl"><button data-act="replace" title="Replace image">Replace</button>' +
-        '  <button data-act="clear" title="Remove image">Remove</button></div>' +
+        '<div class="ctl"><button data-act="replace" title="เปลี่ยนรูป">เปลี่ยนรูป</button>' +
+        '  <button data-act="clear" title="ลบรูป">ลบรูป</button></div>' +
         '<input type="file" accept="' + ACCEPT.join(',') + '" hidden>';
       this._frame = root.querySelector('.frame');
       this._ring = root.querySelector('.ring');
@@ -614,7 +614,11 @@
       this._ring.style.display = mask ? 'none' : '';
 
       // Controls and reframe entry gate on this so share links stay read-only.
-      const editable = !!(window.omelette && window.omelette.writeFile);
+      // ในแอปจริง (Rama9) persist ผ่าน Supabase Storage ไม่ใช่ sidecar → เปิดแก้ไข
+      // ได้ด้วยแฟล็ก window.KK_IMG_EDITABLE (ตั้งใน app.js) ทำให้ปุ่ม Replace/Remove
+      // + การลากครอบรูป (reframe) ใช้งานได้แม้ไม่มี window.omelette
+      const editable = (window.KK_IMG_EDITABLE === true) ||
+        !!(window.omelette && window.omelette.writeFile);
       this.toggleAttribute('data-editable', editable);
       this._sub.style.display = editable ? '' : 'none';
 
@@ -623,7 +627,9 @@
       // data:image/ URLs from it. The `src` attribute is author-controlled
       // (Claude wrote it into the HTML) so it passes through unchanged.
       let stored = this.id ? getSlot(this.id) : this._local;
-      if (stored && stored.u && !/^data:image\//i.test(stored.u)) stored = null;
+      // รับทั้ง data:image (เพิ่งอัป) และ https:// (รูปจาก Supabase Storage ที่
+      // image-sync โหลดกลับมา) — เพื่อให้รูปเดิมโชว์ในช่อง → กดเปลี่ยน/ลบได้
+      if (stored && stored.u && !/^(data:image\/|https?:\/\/)/i.test(stored.u)) stored = null;
       const srcAttr = this.getAttribute('src') || '';
       this._userUrl = (stored && stored.u) || null;
       const url = this._userUrl || srcAttr;

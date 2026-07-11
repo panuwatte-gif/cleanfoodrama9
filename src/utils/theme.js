@@ -7,9 +7,10 @@
 
 import { load, save } from "./storage.js";
 
+// ค่าเริ่มต้น = ชมพูพาสเทลนุ่ม (Soft Kawaii) — จับคู่ skin kawaii.css
 export const COLOR_DEFAULTS = {
-  primary: "#62B98C", secondary: "#5B8DEF", bg: "#F6F8F4", surface: "#FFFFFF",
-  text: "#384B40", warning: "#F0A93B", pending: "#F0A93B", fab: "#62B98C",
+  primary: "#F76CA0", secondary: "#8FB7F2", bg: "#FFF7FA", surface: "#FFFFFF",
+  text: "#4E3A45", warning: "#F4A64C", pending: "#F4A64C", fab: "#F76CA0",
 };
 
 const hx = (c) => { c = c.replace("#", ""); if (c.length === 3) c = c.split("").map((x) => x + x).join(""); return [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16)); };
@@ -31,7 +32,7 @@ export function themeToVars(th) {
   };
 }
 
-const KEY = "theme:v1";
+const KEY = "theme:v2";   // bumped: palette switched green → kawaii pink (ignore stale v1)
 export function loadTheme() { return { ...COLOR_DEFAULTS, ...(load(KEY, {}) || {}) }; }
 export function saveTheme(theme) { save(KEY, theme); }
 

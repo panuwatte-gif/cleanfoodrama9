@@ -78,7 +78,7 @@ export function comboChart({ daily, target, breakeven }) {
 }
 
 /* ---------- แท่งย้อนหลัง 30 วัน (วันนี้ทึบ · ย้อนหลังพาสเทล) ---------- */
-export function miniBars(data, { solid = "#54AE7B", soft = "#CFE8C7", h = 88 } = {}) {
+export function miniBars(data, { solid = "#F76CA0", soft = "#FAD6E4", h = 88 } = {}) {
   const W = 320, H = h, padB = 14, padT = 6;
   const n = data.length;
   const max = Math.max(...data.map((d) => d.v)) || 1;
@@ -140,7 +140,7 @@ export function pieChart(segs, { size = 132, thickness = 26 } = {}) {
 }
 
 /* ---------- แท่งเดี่ยว: ยอดขายรวมรายวัน (สเกลของตัวเอง) ---------- */
-export function barChart(data, { h = 118, color = "#54AE7B" } = {}) {
+export function barChart(data, { h = 118, color = "#F76CA0" } = {}) {
   const W = 320, H = h, padT = 12, padB = 18, padR = 4, padL = 22;
   const n = data.length || 1;
   const max = niceCeil(Math.max(...data.map((d) => d.v), 1));

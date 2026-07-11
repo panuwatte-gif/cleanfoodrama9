@@ -252,7 +252,7 @@ export const TASKS_SEED = [
    • สาขาแรก (หลัก) = ดึงยอดจากบันทึกรายได้จริง (MONEY.days[d].in)
    • สาขาอื่น = เดโม deterministic (สัดส่วนจากสาขาหลัก) จนกว่าจะต่อข้อมูลจริง
    คืน { branches:[{name,color}], days:[{d, byBranch, total}], today:[{name,color,today}], todayTotal } */
-export const BRANCH_COLORS = ['#54AE7B', '#5B9BF6', '#B98AF0', '#F4A259', '#E26D8A'];
+export const BRANCH_COLORS = ['#F76CA0', '#5B9BF6', '#B98AF0', '#F4A259', '#54AE7B'];
 const _BRANCH_FACTOR = [1, 0.82, 0.6, 0.48, 0.4];
 
 export function branchDailySales(shopNames) {

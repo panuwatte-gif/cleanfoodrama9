@@ -15,7 +15,9 @@ const PREFIX = "slots";
 
 let started = false;
 const lastUploaded = {};   // slotId -> data URL ที่อัปขึ้นคลาวด์ไปแล้ว (กันอัปซ้ำ)
+const cloudSlots = new Set();   // slotId ที่ "มีไฟล์อยู่บนคลาวด์" (ไว้รู้ว่าต้องลบเมื่อผู้ใช้เอารูปออก)
 const uploading = new Set();
+const deleting = new Set();
 
 const safeId = (id) => String(id).replace(/[^a-zA-Z0-9_-]/g, "_");
 
@@ -39,6 +41,7 @@ export async function initImageSync() {
     for (const f of files || []) {
       if (!f.name || !/\.webp$/i.test(f.name)) continue;
       const slotId = f.name.replace(/\.webp$/i, "");
+      cloudSlots.add(slotId);   // มีไฟล์บนคลาวด์แล้ว → จำไว้เพื่อรองรับการลบ
       const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(`${PREFIX}/${f.name}`);
       if (pub && pub.publicUrl) {
         // cache-bust เบาๆ ด้วย updated_at เพื่อให้รูปใหม่เด้งทันทีหลังเปลี่ยน
@@ -48,9 +51,10 @@ export async function initImageSync() {
     }
   } catch (_) { /* โหลดไม่ได้ก็ข้าม */ }
 
-  // ── ขาขึ้น: เฝ้าการเปลี่ยนแปลง → อัปรูปใหม่ขึ้นคลาวด์ ──
+  // ── ขาขึ้น: เฝ้าการเปลี่ยนแปลง → อัปรูปใหม่ขึ้นคลาวด์ + ลบรูปที่ผู้ใช้เอาออก ──
   async function mirror() {
     const all = window.kkSlots.all();
+    // (1) อัปรูปใหม่ (data: URL) ขึ้นคลาวด์
     for (const id of Object.keys(all)) {
       const v = all[id];
       const u = typeof v === "string" ? v : (v && v.u);
@@ -62,9 +66,23 @@ export async function initImageSync() {
         const path = `${PREFIX}/${safeId(id)}.webp`;
         const { error } = await sb.storage.from(BUCKET)
           .upload(path, blob, { upsert: true, contentType: "image/webp" });
-        if (!error) lastUploaded[id] = u;
+        if (!error) { lastUploaded[id] = u; cloudSlots.add(id); }
       } catch (_) { /* ลองใหม่รอบหน้า */ }
       finally { uploading.delete(id); }
+    }
+    // (2) ลบไฟล์บนคลาวด์เมื่อผู้ใช้กด "ลบรูป" (slot ว่าง/หายไปแล้ว)
+    //     ไม่งั้นรอบโหลดถัดไปจะดึงรูปเก่ากลับมาโชว์ → ลบไม่ติด
+    for (const id of Array.from(cloudSlots)) {
+      const raw = window.kkSlots.getRaw(id);
+      const stillHas = raw && raw.u;
+      if (stillHas || deleting.has(id)) continue;
+      deleting.add(id);
+      try {
+        const path = `${PREFIX}/${safeId(id)}.webp`;
+        const { error } = await sb.storage.from(BUCKET).remove([path]);
+        if (!error) { cloudSlots.delete(id); delete lastUploaded[id]; }
+      } catch (_) { /* ลองใหม่รอบหน้า */ }
+      finally { deleting.delete(id); }
     }
   }
 

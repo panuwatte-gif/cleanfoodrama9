@@ -8,10 +8,51 @@ import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, tag } from "../components/components.js";
 import { cuteIcons } from "../components/components.js";
-import { mascot } from "../components/mascot.js";
+import { mascot, cic } from "../components/mascot.js";
 import { teamCard } from "./users.js";
 import { isPlaceholderName } from "../services/authService.js";
 import { actionCount } from "../utils/messages.js";
+import { getPrepHidden, setPrepCatOn } from "../forecast/formulaLibrary.js";
+import { toggle } from "../components/components.js";
+
+// หมวดในหน้า "คำแนะนำการเตรียมของ" (เปิด/ปิดการแสดงผล)
+const PREP_CATS = [
+  { id: "protein", name: "กับข้าว", emoji: "\uD83C\uDF73", c: "green" },
+  { id: "drink", name: "เครื่องดื่ม", emoji: "\uD83E\uDD64", c: "blue" },
+  { id: "egg", name: "ไข่", emoji: "\uD83E\uDD5A", c: "amber" },
+  { id: "sauce", name: "ซอส / น้ำจิ้ม", emoji: "\uD83E\uDED9", c: "rose" },
+  { id: "rice", name: "ข้าว", emoji: "\uD83C\uDF5A", c: "violet" },
+  { id: "pack", name: "บรรจุภัณฑ์", emoji: "\uD83D\uDCE6", c: "amber" },
+  { id: "dry", name: "อื่นๆ", emoji: "\uD83E\uDED9", c: "violet" },
+];
+
+// การ์ดตั้งค่า "คำแนะนำการเตรียมของ" — toggle เปิด/ปิดหมวดที่จะโชว์ในหน้าเตรียมของ
+function prepCatCard(go) {
+  const card = h("div", { class: "card more-card soft-green", style: { padding: "4px 16px" } });
+  function paint() {
+    const hidden = getPrepHidden();
+    const onCount = PREP_CATS.filter((c) => !hidden.includes(c.id)).length;
+    card.replaceChildren(
+      h("div", { class: "rowflex", style: { padding: "12px 2px 10px", borderBottom: "1px solid var(--border-soft)" } },
+        h("span", { class: "catic emo more-ic green" }, h("span", { class: "emo-g" }, "\uD83D\uDCCB")),
+        h("span", { style: { flex: 1, minWidth: 0 } },
+          h("span", { style: { display: "block", fontWeight: 700, fontSize: "14.5px" } }, "หมวดที่แสดงในหน้าเตรียมของ"),
+          h("span", { style: { display: "block", fontSize: "12px", color: "var(--muted)" } }, "ปิดหมวดที่ไม่ได้ดู ให้หน้าจอโล่ง · กำลังโชว์ " + onCount + "/" + PREP_CATS.length + " หมวด")),
+        h("button", { type: "button", class: "mini-btn", onClick: () => go({ name: "forecast" }) }, pi("chev", 14)),
+      ),
+      ...PREP_CATS.map((c, i) => {
+        const on = !hidden.includes(c.id);
+        return h("div", { class: "rowflex", style: { padding: "11px 2px", borderBottom: i < PREP_CATS.length - 1 ? "1px solid var(--border-soft)" : "none" } },
+          h("span", { class: "catic emo more-ic " + c.c }, h("span", { class: "emo-g" }, c.emoji)),
+          h("span", { style: { flex: 1, fontWeight: 600, fontSize: "14px" } }, c.name),
+          toggle(on, (v) => { setPrepCatOn(c.id, v); paint(); }),
+        );
+      }),
+    );
+  }
+  paint();
+  return card;
+}
 
 // หัวสีสันพาสเทล (เข้าชุดหน้าแรก) แทน hdr ปกติ
 function moreHero({ title, sub, art }) {
@@ -40,8 +81,39 @@ function moreRow({ ic, emoji, c = "green", t, s, onClick, badge }) {
   );
 }
 
+// การ์ดข้อมูลกลางของ "ร้าน" — หัวข้อหลัก 1 ร้าน · ข้างในมี สั่งของ/รับของ + สินค้าคงเหลือ
+function storeDataCard(go, store) {
+  const inner = ({ tint, icon, t, s, route, mode }) =>
+    h("button", {
+      type: "button", class: "storedata-tile list-press soft-card soft-" + tint,
+      onClick: () => go(mode ? { name: route, mode } : { name: route }),
+    },
+      h("span", { class: "catic " + tint }, cic(icon, 28)),
+      h("div", { class: "storedata-tt" }, t),
+      h("div", { class: "storedata-sub" }, s),
+      h("span", { class: "storedata-go" }, "เปิด", pi("chev", 12)),
+    );
+  return h("div", { class: "card more-card storedata-card soft-green" },
+    // หัวการ์ด = ชื่อร้าน + ทางเข้าแก้ข้อมูลกลาง
+    h("div", { class: "storedata-head" },
+      h("span", { class: "storedata-mascot" }, mascot(34)),
+      h("div", { style: { flex: 1, minWidth: 0 } },
+        h("div", { class: "storedata-name" }, store),
+        h("div", { class: "storedata-meta" }, "ข้อมูลกลางของร้าน · สั่งของ · คงเหลือ"),
+      ),
+      h("button", { type: "button", class: "storedata-edit list-press", onClick: () => go({ name: "master" }) }, pi("db", 14), "แก้ข้อมูลกลาง"),
+    ),
+    // การ์ดด้านใน 2 ใบ
+    h("div", { class: "storedata-grid" },
+      inner({ tint: "blue", icon: "delivery", t: "สั่งของ / รับของ", s: "สั่งล่วงหน้า · ยืนยันรับของ", route: "orderrecv", mode: "recv" }),
+      inner({ tint: "violet", icon: "box", t: "สินค้าคงเหลือ", s: "คงเหลือจริง · FIFO · มูลค่า", route: "stocklist" }),
+    ),
+  );
+}
+
 export function moreScreen(ctx = {}) {
   const { go, onLogout, user } = ctx;
+  const store = ctx.shopCtx ? ctx.shopCtx.shop : "พระราม 9";
   const mailCount = actionCount(user || { level: "owner" });
   return h("div", { class: "page-wrap", "data-screen-label": "more" },
     h("div", { class: "page stack", style: { paddingTop: "14px" } },
@@ -49,14 +121,20 @@ export function moreScreen(ctx = {}) {
 
       teamCard(ctx),
 
+      h("div", { class: "overline ov-green" }, "ข้อมูลกลาง · ร้าน"),
+      storeDataCard(go, store),
+
       h("div", { class: "overline ov-violet" }, "งานและทีม"),
       h("div", { class: "card more-card soft-violet" },
         moreRow({ ic: "mail", emoji: "💌", c: "violet", t: "งานและข้อความ", s: "ส่งข้อความ · มอบหมายงานให้หัวหน้า/พนักงาน · ติดตามผล", badge: mailCount, onClick: () => go({ name: "messages" }) }),
       ),
 
+      h("div", { class: "overline ov-violet" }, "คำแนะนำการเตรียมของ"),
+      prepCatCard(go),
+
       h("div", { class: "overline ov-blue" }, "ข้อมูล & สูตร"),
       h("div", { class: "card more-card soft-blue" },
-        moreRow({ ic: "db", emoji: "🗄️", c: "blue", t: "ข้อมูลกลาง", s: "เพิ่ม/ลบ/แก้/เลื่อนสลับ/ย้ายหมวด — ทุกหน้าเปลี่ยนตาม", onClick: () => go({ name: "master" }) }),
+        moreRow({ ic: "settings", emoji: "📈", c: "blue", t: "สูตรพยากรณ์", s: "เลือก/ปรับสูตร · กำหนดช่วงวัน · ข้าว ×1.5", onClick: () => go({ name: "formulasettings" }) }),
         moreRow({ ic: "users", emoji: "👥", c: "orange", t: "ค่าแรงพนักงาน", s: "รายวัน / เงินเดือน + OT — กรอกและดูสรุปค่าแรงทั้งร้าน", onClick: () => go({ name: "payroll" }) }),
         moreRow({ ic: "settings", emoji: "⚙️", c: "green", t: "ปรับค่า assumption", s: "GP% · ค่าการตลาด · ไข่/แผง · เกณฑ์สต๊อกต่ำ · เผื่อสั่งของ · ภาษี", onClick: () => go({ name: "assumptions" }) }),
         moreRow({ ic: "swap", emoji: "🔄", c: "teal", t: "แปลงหน่วย", s: "ความหมายหน่วยนับ + การเทียบ/แปลงหน่วยอัตโนมัติในระบบ", onClick: () => go({ name: "unitconvert" }) }),

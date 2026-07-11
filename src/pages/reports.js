@@ -10,13 +10,15 @@
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
 import { hdr, note, tag, meter, itemIc, emo, emptyState, sectionTabs } from "../components/components.js";
+import { cic } from "../components/mascot.js";
 import { storeChip } from "../components/layout.js";
 import { cumLinesChart } from "../components/charts.js";
-import { fmt, itemById, unitOf, stockOf, breakevenPerDay, coverDays, reorderPoint, fmtQty, fmtRate, matchCat } from "../utils/formulas.js";
+import { fmt, itemById, unitOf, stockOf, breakevenPerDay, coverDays, reorderPoint, fmtQty, fmtRate, matchCat, fc7 } from "../utils/formulas.js";
 import { items, cats, incomeRows, expenseRows, countsRows } from "../data/store.js";
 import { REV_TARGET_YEAR, COST_MODEL, BRANCH_COLORS, EXP_INV_CAT } from "../data/seed.js";
 import { salesRanking, latestDayResults, inferDailySales, DOW_TH } from "../utils/usage.js";
 import { thaiShort, recDate } from "../utils/dateutil.js";
+import { getPrepHidden } from "../forecast/formulaLibrary.js";
 
 const bold = (t) => h("b", null, t);
 const lowCount = () => (items() || []).filter((it) => it.isActive !== false && stockOf(it.id).st !== "ok").length;
@@ -62,6 +64,62 @@ const realStockValue = () => Math.round((items() || []).filter((it) => it.isActi
   .reduce((s, it) => s + (stockOf(it.id).qty || 0) * (it.cost || 0), 0));
 
 /* ===================== แท็บรายงาน ===================== */
+// การ์ด "คำแนะนำการสั่งของ" (ย้ายมาจากหน้าเตรียมของ) — มี tab หมวดหมู่ + รายการที่ควรสั่ง
+const ORDER_GROUPS = [
+  { id: "protein", name: "กับข้าว", icon: "pan", tint: "green" },
+  { id: "drink", name: "เครื่องดื่ม", icon: "cup2", tint: "blue" },
+  { id: "egg", name: "ไข่", icon: "egg", tint: "amber" },
+  { id: "sauce", name: "ซอส", icon: "drop", tint: "rose" },
+  { id: "rice", name: "ข้าว", icon: "rice", tint: "violet" },
+  { id: "pack", name: "บรรจุภัณฑ์", icon: "box", tint: "amber" },
+];
+function orderPlanCard(go) {
+  const card = h("div", { class: "card soft-card soft-rose", style: { padding: "14px" } });
+  let cat = "all";
+  // รายการที่ควรสั่ง = คาดใช้/วัน (จาก fc7) > คงเหลือ → ขาด
+  function needList(catId) {
+    return (items() || []).filter((it) => it.isActive !== false && (catId === "all" || it.cat === catId))
+      .map((it) => {
+        const s = fc7(it.id); const dayUse = s ? s.wavg : 0;
+        const onHand = (stockOf(it.id).qty || 0);
+        const u = unitOf(it);
+        const rec = s ? s.rec : 0;            // แนะนำสั่ง/วัน (มี buffer)
+        const need = Math.max(0, Math.round((dayUse - onHand) * 10) / 10);
+        return { it, u, onHand, dayUse, rec, need };
+      })
+      .filter((x) => x.need > 0)
+      .sort((a, b) => b.need - a.need);
+  }
+  function paint() {
+    const groups = ORDER_GROUPS.filter((g) => cats().some((c) => c.id === g.id));
+    const tabs = h("div", { class: "chip-tabs cat-tabs", style: { marginBottom: "10px" } },
+      h("button", { type: "button", class: "chip" + (cat === "all" ? " active" : ""), onClick: () => { cat = "all"; paint(); } }, pi("grid", 13), "ทั้งหมด"),
+      ...groups.map((g) => h("button", { type: "button", class: "chip" + (cat === g.id ? " active" : ""), onClick: () => { cat = g.id; paint(); } }, emo(g.icon, { s: 13 }), g.name)));
+    const list = needList(cat).slice(0, 6);
+    const rows = list.length
+      ? list.map((x) => h("div", { class: "rowflex", style: { gap: "9px", padding: "8px 0", borderTop: "1px solid var(--border-soft)" } },
+          itemIc(x.it),
+          h("span", { style: { flex: 1, minWidth: 0 } },
+            h("span", { style: { display: "block", fontWeight: 700, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, x.it.name),
+            h("span", { style: { fontSize: "11px", color: "var(--muted)" } }, "คงเหลือ " + fmtQty(x.onHand, x.u) + " · คาดใช้ " + fmtQty(x.dayUse, x.u) + "/วัน")),
+          h("span", { class: "tnum", style: { fontWeight: 800, fontSize: "13.5px", color: "var(--danger-ink)" } }, "สั่ง " + fmtQty(x.rec, x.u) + " " + x.u)))
+      : [h("div", { style: { padding: "16px 4px", textAlign: "center", color: "var(--muted)", fontSize: "12.5px" } }, "หมวดนี้ของพอแล้ว — ยังไม่ต้องสั่งเพิ่ม 💚")];
+    card.replaceChildren(
+      h("div", { class: "split", style: { marginBottom: "10px" } },
+        h("div", { class: "rowflex" }, h("span", { class: "catic rose sm" }, pi("cart", 16)),
+          h("div", null, h("div", { style: { fontWeight: 800, fontSize: "15px" } }, "คำแนะนำการสั่งของ"),
+            h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ความจุตู้ + รอบส่ง → ต้องสั่งอะไรเท่าไร"))),
+        tag(list.length + " ควรสั่ง", { kind: list.length ? "dgr" : "ok", iconName: "cart" })),
+      tabs,
+      ...rows,
+      h("button", { type: "button", class: "orderplan-cta", style: { marginTop: "12px" }, onClick: () => go({ name: "orderplan" }) },
+        cic("delivery", 28), h("div", { style: { flex: 1, textAlign: "left" } }, h("div", { style: { fontWeight: 800, fontSize: "14px" } }, "เปิดแผนสั่งของเต็ม"), h("div", { style: { fontSize: "11px", opacity: .9 } }, "ความจุตู้ · รอบส่ง · FIFO")), pi("chev", 18)),
+    );
+  }
+  paint();
+  return card;
+}
+
 export function reportsScreen({ go, role, shopCtx } = {}) {
   const store = shopCtx ? shopCtx.shop : "พระราม 9";
   const daily = realDaily();
@@ -134,6 +192,7 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
   return h("div", { class: "page-wrap", "data-screen-label": "reports" },
     hdr({ title: "รายงาน", sub: store + " · รายงานผลทั้งหมดอยู่ที่นี่", right: storeChip(shopCtx) }),
     h("div", { class: "page stack" },
+      orderPlanCard(go),
       card("soft-blue", "box", "blue", "สินค้าคงเหลือ & ของทิ้ง",
         tag(stockHave.length + " รายการ", { kind: "fifo", iconName: "box" }),
         h("div", { class: "rowflex", style: { gap: "10px", marginTop: "11px" } },

@@ -70,7 +70,6 @@ export function storeChip(ctx) {
           h("span", { style: { display: "block", fontWeight: 700, fontSize: "13.5px" } }, s.name),
           h("span", { style: { display: "block", fontSize: "11px", color: "var(--muted)" } }, s.soon ? "ยังไม่เปิด · เตรียมล่วงหน้าได้" : "เปิดขายอยู่"),
         ),
-        s.soon && h("span", { class: "badge badge-yellow" }, "ใหม่"),
         ctx.shop === s.name && (() => { const c = pi("check", 16); c.style.color = "var(--primary)"; return c; })(),
       ),
       canEdit && h("button", { type: "button", class: "store-edit-btn", "aria-label": "แก้ชื่อร้าน", onClick: () => { editing = s.name; render(); } }, pi("edit", 14)),

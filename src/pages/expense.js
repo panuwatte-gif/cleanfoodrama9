@@ -13,9 +13,21 @@ import { fmt, itemsOf, catById, unitOf } from "../utils/formulas.js";
 import { EXP_INV_CAT } from "../data/seed.js";
 import { saveExpenseRecord, expenseRows } from "../data/store.js";
 import { todayIso, thaiShort, recDate, parseIso } from "../utils/dateutil.js";
+import { load, save } from "../utils/storage.js";
 
 // หมวดค่าใช้จ่าย (ตัวแรกๆ = ลิงก์ข้อมูลกลาง กรอกเป็นรายการ · ที่เหลือกรอกยอดรวม)
-const EXP_CATS = ['บรรจุภัณฑ์', 'ข้าว', 'ซอส/น้ำจิ้ม', 'อื่นๆ', 'ค่าเช่า', 'ค่าไฟ', 'ค่าน้ำ', 'เน็ต/โทร', 'ค่าส่ง/ค่าเดินทาง'];
+const EXP_CATS_BASE = ['บรรจุภัณฑ์', 'ข้าว', 'ซอส/น้ำจิ้ม', 'อื่นๆ', 'ค่าเช่า', 'ค่าไฟ', 'ค่าน้ำ', 'เน็ต/โทร', 'ค่าส่ง/ค่าเดินทาง'];
+const CC_KEY = "expense:customCats:v1";
+const customCats = () => (load(CC_KEY, []) || []).filter((c) => typeof c === "string" && c.trim());
+const expCats = () => [...EXP_CATS_BASE, ...customCats().filter((c) => !EXP_CATS_BASE.includes(c))];
+function addCustomCat(name) {
+  const n = (name || "").trim();
+  if (!n) return false;
+  if (expCats().includes(n)) return false;
+  save(CC_KEY, [...customCats(), n]);
+  return true;
+}
+function removeCustomCat(name) { save(CC_KEY, customCats().filter((c) => c !== name)); }
 
 const bold = (t) => h("b", null, t);
 const num = (v) => parseFloat(v || 0) || 0;
@@ -105,10 +117,32 @@ function paint(root) {
   };
 
   // chips
-  const chips = EXP_CATS.map((c) => h("button", {
-    type: "button", class: "chip" + (cat === c ? " active" : ""), onClick: () => { est.cat = c; paint(root); },
-  }, EXP_INV_CAT[c] && emo(catById(EXP_INV_CAT[c]).icon, { s: 12 }), c));
-  chips.push(h("button", { type: "button", class: "chip", style: { color: "var(--muted)" }, onClick: () => toast("เพิ่ม/จัดการหมวดได้ที่ ข้อมูลกลาง") }, pi("plus", 12), " เพิ่มหมวด"));
+  const isCustom = (c) => customCats().includes(c) && !EXP_CATS_BASE.includes(c);
+  const chips = expCats().map((c) => {
+    const btn = h("button", {
+      type: "button", class: "chip" + (cat === c ? " active" : ""), onClick: () => { est.cat = c; paint(root); },
+    }, EXP_INV_CAT[c] && emo(catById(EXP_INV_CAT[c]).icon, { s: 12 }), c);
+    if (isCustom(c)) {
+      btn.append(h("span", {
+        class: "chip-x", "aria-label": "ลบหมวด",
+        style: { marginLeft: "5px", fontWeight: 800, opacity: .7, cursor: "pointer" },
+        onClick: (e) => {
+          e.stopPropagation();
+          if (!confirm('ลบหมวด "' + c + '" ?\n(บันทึกที่มีอยู่ในหมวดนี้จะยังอยู่)')) return;
+          removeCustomCat(c);
+          if (est.cat === c) est.cat = "บรรจุภัณฑ์";
+          paint(root);
+        },
+      }, "✕"));
+    }
+    return btn;
+  });
+  chips.push(h("button", { type: "button", class: "chip", style: { color: "var(--primary-deep)", fontWeight: 700 }, onClick: () => {
+    const name = prompt("ตั้งชื่อหมวดค่าใช้จ่ายใหม่\n(หมวดที่เพิ่มเองกรอกเป็นยอดรวม · แก้ย้อนหลังได้)");
+    if (name == null) return;
+    if (addCustomCat(name)) { est.cat = name.trim(); est.amt = ""; est.editId = null; est.editNote = ""; paint(root); toast('เพิ่มหมวด "' + name.trim() + '" แล้ว'); }
+    else if (name.trim()) toast("มีหมวดนี้อยู่แล้ว", "err");
+  } }, pi("plus", 12), " เพิ่มหมวด"));
 
   let body, foot;
   if (invCatId) {

@@ -49,6 +49,8 @@ import { forecastScreen } from "./pages/forecast.js";
 import { taxScreen } from "./pages/tax.js";
 import { execSummaryScreen } from "./pages/execsummary.js";
 import { orderExpenseScreen } from "./pages/orderexpense.js";
+import { orderPlanScreen } from "./pages/orderplan.js";
+import { reportBackScreen } from "./pages/reportback.js";
 import { lineSendScreen } from "./pages/linesend.js";
 import { reportsScreen, incExpReportScreen, topSellersScreen, lowSellersScreen, stockReportScreen } from "./pages/reports.js";
 import { stockNowScreen, recvReportScreen } from "./pages/stockview.js";
@@ -56,9 +58,13 @@ import { dataScreen } from "./pages/data.js";
 import { nutritionScreen } from "./pages/nutrition.js";
 import { menuListScreen } from "./pages/menulist.js";
 import { forecastSettingsScreen } from "./pages/forecastsettings.js";
+import { formulaSettingsScreen } from "./pages/formulasettings.js";
 import { messagesScreen } from "./pages/messages.js";
 import { exportScreen } from "./pages/export.js";
 import "./lib/image-slot.js"; // ลงทะเบียน <image-slot> + window.kkSlots
+// เปิดให้ <image-slot> แก้ไขได้ในแอปจริง (ปุ่มเปลี่ยนรูป/ลบรูป + ลากครอบรูป)
+// แม้ไม่มี window.omelette — เพราะรูป persist ผ่าน Supabase Storage (image-sync.js)
+window.KK_IMG_EDITABLE = true;
 import { initImageSync } from "./lib/image-sync.js"; // เชื่อมรูป ↔ Supabase Storage
 import { initGestures } from "./lib/gestures.js"; // ลากเลื่อนแท็บ (PC) + ปัดขอบจอ back/forward
 import { recordTodayRuns } from "./forecast/forecastRuns.js"; // เริ่มเก็บ forecast ก่อนเห็นจริง (backtest)
@@ -195,7 +201,9 @@ function renderContent() {
       case "expense":       return expenseScreen({ ...sctx, date: r.date });
       case "forecast":      return forecastScreen(sctx);
       case "forecastsettings": return forecastSettingsScreen(sctx);
-      case "tax":           return taxScreen(sctx);
+      case "formulasettings": return formulaSettingsScreen(sctx);
+      case "orderplan":     return orderPlanScreen(sctx);
+      case "reportback":    return reportBackScreen(sctx);      case "tax":           return taxScreen(sctx);
       case "execsummary":   return execSummaryScreen(sctx);
       case "orderexpense":  return orderExpenseScreen(sctx);
       case "linesend":      return lineSendScreen(sctx);

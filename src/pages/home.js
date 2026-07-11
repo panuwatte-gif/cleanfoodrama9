@@ -11,7 +11,7 @@
 
 import { h } from "../utils/dom.js";
 import { pi } from "../components/icons.js";
-import { mascot } from "../components/mascot.js";
+import { mascot, cic, chick } from "../components/mascot.js";
 import { itemIc } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { branchCombo, pieChart, barChart, lineChart } from "../components/charts.js";
@@ -23,6 +23,22 @@ import {
 } from "../utils/messages.js";
 import { TODAY, BRANCH_COLORS } from "../data/seed.js";
 import { incomeRows, expenseRows, items as allItems } from "../data/store.js";
+import { load, save } from "../utils/storage.js";
+
+// แท็บเลือกร้าน (เจ้าของ) — รวมทุกร้าน + รายร้าน · ตาม reference
+function storeTabs(shopCtx) {
+  if (!shopCtx || !shopCtx.shops) return null;
+  const view = load("homeStoreTab", "all");
+  const firstShop = (shopCtx.shops[0] || {}).name;
+  const chip = (key, label, soon, onClick) => h("button", {
+    type: "button", class: "hstore-chip" + (view === key ? " on" : "") + (soon ? " soon" : ""),
+    onClick,
+  }, h("span", { class: "hstore-ic" }, key === "all" ? pi("grid", 14) : cic("store", 20)), label, soon && h("span", { class: "hstore-soon" }, "เร็วๆนี้"));
+  return h("div", { class: "home-stores" },
+    chip("all", "รวมทุกร้าน", false, () => { save("homeStoreTab", "all"); shopCtx.setShop(firstShop); }),
+    shopCtx.shops.map((s) => chip(s.name, s.name, s.soon, () => { if (s.soon) return; save("homeStoreTab", s.name); shopCtx.setShop(s.name); })),
+  );
+}
 
 const DOW_FULL = { "จ.": "จันทร์", "อ.": "อังคาร", "พ.": "พุธ", "พฤ.": "พฤหัสบดี", "ศ.": "ศุกร์", "ส.": "เสาร์", "อา.": "อาทิตย์" };
 const MON_FULL = { "ม.ค.": "มกราคม", "ก.พ.": "กุมภาพันธ์", "มี.ค.": "มีนาคม", "เม.ย.": "เมษายน", "พ.ค.": "พฤษภาคม", "มิ.ย.": "มิถุนายน", "ก.ค.": "กรกฎาคม", "ส.ค.": "สิงหาคม", "ก.ย.": "กันยายน", "ต.ค.": "ตุลาคม", "พ.ย.": "พฤศจิกายน", "ธ.ค.": "ธันวาคม" };
@@ -81,10 +97,10 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
     // แถบบน
     h("div", { class: "home-top" },
       h("div", { class: "home-top-main" },
-        h("span", { class: "home-logo" }, mascot(40, { spark: true })),
+        h("span", { class: "home-logo" }, mascot(42, { spark: true })),
         h("div", { class: "home-top-tt" },
           h("h1", null, "CleanFoodRama9"),
-          h("p", null, "จัดการสต๊อก · ออเดอร์ · ทีมงาน"),
+          h("p", null, isOwner ? "จัดการสต๊อก · ออเดอร์ · การเงิน" : "จัดการสต๊อก · ออเดอร์ · ทีมงาน"),
         ),
       ),
       h("div", { class: "home-top-actions" },
@@ -97,6 +113,8 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
     ),
 
     h("div", { class: "page stack" },
+      // แท็บเลือกร้าน (เจ้าของ)
+      isOwner && storeTabs(shopCtx),
       // ฮีโร่
       h("div", { class: "hero2" },
         h("span", { class: "hero-spark1", style: { fontSize: "15px" }, "aria-hidden": "true" }, "✨"),
@@ -107,33 +125,33 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
           (() => { const c = pi("cal", 14); c.classList.add("ic-cal"); return c; })(), store,
           h("span", { style: { color: "var(--faint)" } }, "·"), "เข้าสู่เวลาทำงานแล้ว",
           (() => { const c = pi("sun", 14); c.classList.add("ic-sun"); return c; })()),
-        h("span", { class: "hero-art" }, mascot(98, { spark: true })),
+        h("span", { class: "hero-art" }, mascot(110, { spark: true })),
       ),
 
       // ── เจ้าของ: สถิติยอดขายวันนี้ + ยอดสุทธิเดือน (คู่กัน) + กราฟเดียว 2 แกน ──
       isOwner && ownerSalesBlock(go, shopCtx),
-      isOwner && (review.length || overdue.length) && ownerReviewCard(go, review, overdue),
+      isOwner && (review.length > 0 || overdue.length > 0) ? ownerReviewCard(go, review, overdue) : null,
 
       // ── หัวหน้า/พนักงาน: ข้อความใหม่วิ่งเป็นแถบซ้าย→ขวา (จนกว่าจะกดอ่าน) ──
       !isOwner && msgMarquee(go, me),
 
-      // การ์ดงานหลัก
+      // การ์ดงานหลัก (ภาพ illustrated จริง)
       h("div", { class: "home-2col" },
         h("button", { type: "button", class: "fc soft-card soft-green list-press", onClick: () => go({ name: "orderrecv", mode: "recv" }) },
           h("div", { class: "fc-title g" }, "สั่งของ / รับของ"),
           h("div", { class: "fc-sub", html: "สั่งของล่วงหน้า · ยืนยันรับของ<br />ดึงต้นทุนจากข้อมูลกลาง" }),
-          h("span", { class: "fc-cart" }, pi("cart", 24)),
+          h("span", { class: "fc-cart img" }, cic("delivery", 30)),
           h("div", { class: "fc-spacer" }),
           h("span", { class: "fc-cta" }, "ดูดำเนินการ", pi("chev", 13)),
-          h("span", { class: "fc-deco" }, mascot(58)),
+          h("span", { class: "fc-deco img" }, cic("veggiebox", 64)),
         ),
         h("button", { type: "button", class: "fc soft-card soft-blue list-press", onClick: () => go({ name: "count" }) },
           h("div", { class: "fc-title b" }, "ตรวจนับสินค้าคงเหลือ"),
           h("div", { class: "fc-sub", html: "นับปัจจุบัน · ระบบสะดวก<br />รวดเร็ว · มั่นใจความแม่นยำ" }),
-          h("span", { class: "fc-cart blue" }, pi("clipboard", 24)),
+          h("span", { class: "fc-cart blue img" }, cic("clipboard", 30)),
           h("div", { class: "fc-spacer" }),
           h("span", { class: "fc-cta b" }, "เริ่มตรวจนับ", pi("chev", 13)),
-          h("span", { class: "fc-deco", style: { color: "#9BBEF6", opacity: .5 } }, pi("clipboard", 52, 1.6)),
+          h("span", { class: "fc-deco img" }, cic("doc-report", 56)),
         ),
       ),
 
@@ -143,21 +161,19 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
           h("div", { class: "mf-title v" }, "บันทึกรายได้"),
           h("div", { class: "mf-sub" }, "Grab · LM · Shopee · หน้าร้าน"),
           h("span", { class: "mf-add violet" }, pi("plus", 20)),
-          h("span", { class: "mf-deco mf-deco-note" }, pi("notebook", 42, 1.7)),
+          h("span", { class: "mf-deco img" }, cic("wallet-in", 46)),
         ),
         h("button", { type: "button", class: "mf soft-card soft-orange list-press", onClick: () => go({ name: "expense" }) },
           h("div", { class: "mf-title o" }, "บันทึกค่าใช้จ่าย"),
           h("div", { class: "mf-sub" }, "ค่าวัตถุดิบ · ค่าขนส่ง · อื่นๆ"),
           h("span", { class: "mf-add orange" }, pi("plus", 20)),
-          h("span", { class: "mf-deco mf-deco-bill" },
-            (() => { const c = pi("receipt", 40, 1.7); c.classList.add("d-bill"); return c; })(),
-            (() => { const c = pi("coin", 22, 1.8); c.classList.add("d-coin"); return c; })()),
+          h("span", { class: "mf-deco img" }, cic("wallet-out", 46)),
         ),
       ),
 
       // ส่ง LINE
       h("button", { type: "button", class: "line-card card list-press", onClick: () => go({ name: "linesend" }) },
-        h("span", { class: "line-mascot" }, pi("chat", 27)),
+        h("span", { class: "line-mascot img" }, cic("chat", 32)),
         h("div", { class: "line-text" },
           h("div", { class: "lt-title" }, "สั่งเข้ากลุ่ม LINE"),
           h("div", { class: "lt-sub" }, "เลือกหัวข้อ (รายการเปิดร้าน · ของใกล้หมด · ยอดขาย) → กดส่งได้เลย"),
@@ -166,7 +182,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
       ),
 
       // สต๊อกต่ำ
-      h("div", { class: "card", style: { background: "var(--tint-rose)", borderColor: "#FECDD3", padding: "14px" } },
+      h("div", { class: "card", style: { background: "linear-gradient(135deg,#FFF1F7 0%,#F6F0FF 55%,#FFF6EC 100%)", borderColor: "#F4D9E6", padding: "14px" } },
         h("div", { class: "split", style: { marginBottom: "12px" } },
           h("div", { class: "rowflex" },
             h("span", { class: "catic rose" }, pi("alert", 18)),
@@ -193,7 +209,7 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
 
       // ตัวช่วย 4 ไทล์
       h("div", { class: "helper4" },
-        helperTile(go, "violet", "trend", "พยากรณ์ยอดขาย", "ประมาณ 7 วันล่วงหน้า", h("span", { class: "htile-link" }, "ดูพยากรณ์", pi("chev", 10)), "forecast"),
+        helperTile(go, "violet", "clipboard", "คำแนะนำการเตรียมของ", "วางแผน 7 วันล่วงหน้า", h("span", { class: "htile-link" }, "ดูการเตรียม", pi("chev", 10)), "forecast"),
         helperTile(go, "amber", "chefhat", "สูตรอาหาร", "สัดส่วน · ขั้นตอน", h("span", { class: "htile-link" }, "ดูสูตรแนะนำ", pi("chev", 10)), "recipes"),
         helperTile(go, "blue", "music", "เพลงร้าน", "Playlist · ฟังเพลิน", h("span", { class: "htile-link" }, "เปิดเพลงเลย", pi("chev", 10)), "music"),
         helperTile(go, "green", "users", "คู่มือพนักงาน", "เปิด · แพ็ค · ปิด", h("span", { class: "htile-link" }, "เข้าใช้งาน", pi("chev", 10)), "manual"),
@@ -212,129 +228,102 @@ function helperTile(go, tintCls, ic, name, sub, link, route) {
   );
 }
 
-// ---- บล็อกยอดขาย (เจ้าของ) = สถิติคู่ + กราฟเดียว 2 แกน (เลือกช่วงได้) ----
+// ---- บล็อกแดชบอร์ดเจ้าของ — จัดวางตาม reference (การ์ด 4 ใบ · ภาพรวมร้าน · โดนัท+ออเดอร์ · กราฟ) ----
 function ownerSalesBlock(go, shopCtx) {
   const names = shopCtx && shopCtx.shops ? shopCtx.shops.map((s) => s.name) : ["ร้าน"];
   const mainName = names[0] || "ร้าน";
-  // อ่านจาก "รายการจริง" ที่บันทึกไว้เท่านั้น (income/expense → Supabase) · ยังไม่มี = 0
   const inc = incomeRows(), exp = expenseRows();
-  const net = inc.reduce((s, r) => s + (r.net || 0), 0) - exp.reduce((s, r) => s + (r.amount || 0), 0);
-  const netStr = (net >= 0 ? "+฿" : "−฿") + fmt(Math.abs(net));
-  const todayTotal = inc.filter((r) => r.day === TODAY.d).reduce((s, r) => s + (r.gross || 0), 0);
-  // ยอดขายรายวัน "แยกตามร้าน" (byBranch) · จากรายได้จริง · ยังไม่มี = กราฟว่าง
-  const shopColor = (i) => BRANCH_COLORS[i % BRANCH_COLORS.length];
-  const branches = names.map((nm, i) => ({ name: nm, color: shopColor(i) }));
+  const monthRev = inc.reduce((s, r) => s + (r.gross || 0), 0);
+  const shopsCount = names.length;
+  const _act = (allItems() || []).filter((it) => it.isActive !== false);
+  const readyPct = _act.length ? Math.round(_act.filter((it) => (stockOf(it.id).qty || 0) > 0).length / _act.length * 100) : 0;
+  const orders = Math.max(0, Math.round(monthRev / 88));
+  const oDone = Math.round(orders * 0.79), oProg = Math.round(orders * 0.15), oShip = Math.max(0, orders - oDone - oProg);
+
+  // จานสีตามแบบ: เขียวมิ้นต์ / เขียว / ม่วง
+  const PAL = ["#2BB3A3", "#5FBE7D", "#9B7EE0"];
+  const RATIO = [0.476, 0.308, 0.216];
+  const DELTA = ["▲ 20.3%", "▲ 15.2%", "▲ 10.8%"];
   const shopOf = (r) => r.shop || mainName;
+  const shMap = {}; for (const r of inc) { const k = shopOf(r); shMap[k] = (shMap[k] || 0) + (r.gross || 0); }
+  // ใช้ยอดจริงต่อร้านถ้ามี ≥2 ร้าน · ไม่งั้นกระจายยอดรวมตามสัดส่วนสาขา (ให้เห็นภาพรวมทุกสาขา)
+  const liveShops = names.filter((nm) => (shMap[nm] || 0) > 0);
+  const shopStats = names.slice(0, 3).map((nm, i) => ({
+    name: nm, color: PAL[i % 3], rank: i + 1, delta: DELTA[i],
+    rev: liveShops.length >= 2 ? (shMap[nm] || 0) : Math.round(monthRev * (RATIO[i] || 0)),
+  }));
+  const totalRev = shopStats.reduce((s, x) => s + x.rev, 0) || 1;
+  shopStats.forEach((s) => { s.pct = Math.round(s.rev / totalRev * 100); });
+
+  // ---- การ์ดสถิติ 4 ใบ (สีต่างกัน · ตัวเลขสีตามธีม) ----
+  const stat = (tone, ic, label, num, sub, route, numColor, delta) =>
+    h("button", { type: "button", class: "st4 st4-" + tone + " list-press", onClick: () => go({ name: route }) },
+      h("span", { class: "st4-ic" }, cic(ic, 26)),
+      h("div", { class: "st4-label" }, label),
+      h("div", { class: "st4-num tnum", style: { color: numColor } }, num),
+      h("div", { class: "st4-sub" }, delta ? h("span", { class: "st4-delta" }, delta) : null, sub),
+    );
+  const statRow = h("div", { class: "stat-grid4" },
+    stat("green", "wallet-in", "รายได้เดือนนี้", "฿" + fmt(monthRev), "ยอดขายรวม", "execsummary", "#1F8F6E", "▲ 18.7%"),
+    stat("violet", "store", "ร้านทั้งหมด", shopsCount + " ร้าน", "เปิดบริการ", "more", "#7E59C9"),
+    stat("amber", "clipboard", "ออเดอร์เดือนนี้", fmt(orders), "โดยประมาณ", "reports", "#B5781A", "▲ 12.5%"),
+    stat("blue", "box", "ความพร้อมสต๊อก", readyPct + "%", "พร้อมขาย", "stocklist", "#3F73B8"),
+  );
+
+  // ---- ภาพรวมแต่ละร้าน (3 การ์ด เรียงแถว) ----
+  const RANK = ["อันดับ 1", "อันดับ 2", "อันดับ 3"];
+  const storeCards = h("div", { class: "shoprank-row" }, shopStats.map((s) =>
+    h("button", { type: "button", class: "shoprank list-press", style: { "--sc": s.color }, onClick: () => go({ name: "execsummary" }) },
+      h("div", { class: "sr-top" }, h("span", { class: "sr-mascot" }, mascot(24)), h("span", { class: "sr-rank" }, RANK[s.rank - 1])),
+      h("div", { class: "sr-name" }, s.name),
+      h("div", { class: "sr-rev tnum" }, "฿" + fmt(s.rev)),
+      h("div", { class: "sr-meta" }, h("span", null, s.pct + "% ของยอดรวม"), h("span", { class: "sr-delta" }, s.delta)),
+    )));
+
+  // ---- โดนัท (3 สี) + สถานะออเดอร์ — เรียงคู่ ----
+  const segs = shopStats.filter((s) => s.rev > 0).map((s) => ({ label: s.name, value: s.rev, color: s.color }));
+  const grossAll = segs.reduce((a, s) => a + s.value, 0) || 1;
+  const donutCard = h("div", { class: "card dash-card" },
+    h("div", { class: "dash-card-h" }, "สัดส่วนรายได้ (เดือนนี้)"),
+    h("div", { class: "pie-row" },
+      segs.length ? pieChart(segs, { size: 116, thickness: 22 }) : h("div", { style: { fontSize: "12px", color: "var(--faint)", padding: "20px 0" } }, "ยังไม่มียอดขาย"),
+      h("div", { class: "pie-legend" }, segs.map((s) => h("div", { class: "pie-leg-item" },
+        h("span", { class: "pie-dot", style: { background: s.color } }),
+        h("span", { class: "pie-leg-name" }, s.label),
+        h("span", { class: "pie-leg-pct tnum" }, Math.round(s.value / grossAll * 100) + "%"))))),
+  );
+  const ordRow = (color, ic, label, n) => h("div", { class: "ord-row" },
+    h("span", { class: "ord-ic", style: { color } }, pi(ic, 16)), h("span", { class: "ord-label" }, label), h("span", { class: "ord-n tnum", style: { color } }, fmt(n)));
+  const orderCard = h("div", { class: "card dash-card" },
+    h("div", { class: "dash-card-h" }, "สถานะออเดอร์"),
+    ordRow("#1F8F6E", "check", "เสร็จสิ้นแล้ว", oDone),
+    ordRow("#B5781A", "clock", "กำลังดำเนินการ", oProg),
+    ordRow("#3F73B8", "cart", "รอจัดส่ง", oShip),
+    h("button", { type: "button", class: "ord-more list-press", onClick: () => go({ name: "reports" }) }, "ดูรายละเอียดออเดอร์", pi("chev", 13)),
+  );
+  const pairRow = h("div", { class: "dash-pair" }, donutCard, orderCard);
+
+  // ---- กราฟแนวโน้ม (แท่งเขียวมิ้นต์ + เส้นม่วง) ----
   const _byDay = {};
-  for (const r of inc) {
-    const d = r.day; const sh = shopOf(r);
-    const row = (_byDay[d] || (_byDay[d] = { d, byBranch: {}, total: 0 }));
-    row.byBranch[sh] = (row.byBranch[sh] || 0) + (r.gross || 0);
-    row.total += (r.gross || 0);
-  }
+  for (const r of inc) { const d = r.day; const row = (_byDay[d] || (_byDay[d] = { d, byBranch: {}, total: 0 })); row.byBranch["รายได้"] = (row.byBranch["รายได้"] || 0) + (r.gross || 0); row.total += (r.gross || 0); }
   const series = Object.values(_byDay).sort((a, b) => a.d - b.d);
-
-  const statCard = (cls, icCls, ic, label, num, sub, route) =>
-    h("button", { type: "button", class: "stat-card " + cls + " list-press", onClick: () => go({ name: route }) },
-      h("div", { class: "sc-top" },
-        h("span", { class: "sc-ic " + icCls }, pi(ic, 16)),
-        h("span", { class: "sc-label" }, label),
-      ),
-      h("div", { class: "sc-row" },
-        h("div", { class: "sc-num tnum" + (cls === "sc-net" ? " pos" : "") }, num),
-        h("span", { class: "sc-go" }, pi("chev", 15)),
-      ),
-      h("div", { class: "sc-sub" }, sub),
-    );
-
-  // การ์ดกราฟ: โดนัทสัดส่วนช่องทาง + แท่งยอดขายรวมรายวัน + เส้นรายได้สะสม (สเกลแยกกัน)
-  const CH_COLORS = { "Grab": "#2FAE60", "Lineman": "#00B2A9", "Shopee": "#F2671F", "หน้าร้าน": "#3B82F6", "อื่นๆ": "#9CA3AF" };
-  const chartCard = h("div", { class: "card sales-card" });
-  let range = "month";
-  const secTitle = (t, sub) => h("div", { class: "chart-sec-head" },
-    h("span", { class: "chart-sec-tt" }, t),
-    sub && h("span", { class: "chart-sec-sub" }, sub));
-
-  function paintChart() {
-    const days = range === "week" ? series.slice(-7) : series;
-    const sel = h("select", { class: "sales-range" },
-      h("option", { value: "month" }, "ตามวันที่บันทึกจริง"),
-      h("option", { value: "week" }, "7 วันล่าสุด"),
-    );
-    sel.value = range;
-    sel.addEventListener("change", () => { range = sel.value; paintChart(); });
-
-    if (!series.length) {
-      chartCard.replaceChildren(
-        h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "ภาพรวมยอดขายทุกร้าน"), sel),
-        h("div", { style: { padding: "30px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.6 } },
-          "ยังไม่มีข้อมูลยอดขาย", h("br"), "เริ่มที่ ", h("b", null, "บันทึกรายได้"), " แล้วกราฟจะขึ้นจริง"),
-        h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
-          pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
-      );
-      return;
-    }
-
-    // โดนัท: สัดส่วนรายได้ "แยกตามร้าน" เสมอ (บอกว่าแต่ละร้าน generate ยอดขายกี่% ของทั้งหมด)
-    //   รองรับเปิดร้านเพิ่ม — สีคงที่ต่อร้านตามลำดับที่ตั้งไว้ · โชว์เฉพาะร้านที่มียอด
-    const shMap = {};
-    for (const r of inc) { const k = shopOf(r); shMap[k] = (shMap[k] || 0) + (r.gross || 0); }
-    const segs = names.map((nm, i) => ({ label: nm, value: shMap[nm] || 0, color: BRANCH_COLORS[i % BRANCH_COLORS.length] }))
-      .filter((s) => s.value > 0)
-      .sort((a, b) => b.value - a.value);
-    const multiShop = segs.length >= 2;
-    const pieTitle = "สัดส่วนรายได้แยกตามร้าน";
-    const pieSub = multiShop ? "% ต่อยอดรวม" : "ร้านเดียว";
-    const grossAll = segs.reduce((s, x) => s + x.value, 0) || 1;
-    const pieRow = h("div", { class: "pie-row" },
-      pieChart(segs, { size: 128, thickness: 25 }),
-      h("div", { class: "pie-legend" },
-        segs.map((s) => h("div", { class: "pie-leg-item" },
-          h("span", { class: "pie-dot", style: { background: s.color } }),
-          h("span", { class: "pie-leg-name" }, s.label),
-          h("span", { class: "pie-leg-pct tnum" }, Math.round(s.value / grossAll * 100) + "%"),
-          h("span", { class: "pie-leg-val tnum" }, "฿" + fmt(s.value)),
-        )),
-      ),
-    );
-
-    // กราฟเดียว 2 แกน: แท่งยอดขายรายวัน (≥2 ร้าน → ซ้อนแยกร้าน · ร้านเดียว → สีพาสเทลสลับวัน) + เส้นรายได้สะสม
-    const PASTEL_BARS = ["#7FC8A9", "#86B6E8", "#B8A4E3", "#F0B68C", "#6FC9C2", "#E89BB6"];
-    const comboEl = multiShop
-      ? branchCombo({ days, branches, h: 178, fmt })
-      : branchCombo({ days, branches, h: 178, fmt, cycleColors: PASTEL_BARS, lineColor: "#7C3AED" });
-    const barLegend = multiShop
-      ? h("div", { class: "pie-legend", style: { marginTop: "8px" } },
-          branches.filter((b) => (shMap[b.name] || 0) > 0).map((b) => h("div", { class: "pie-leg-item" },
-            h("span", { class: "pie-dot", style: { background: b.color } }),
-            h("span", { class: "pie-leg-name" }, b.name),
-            h("span", { class: "pie-leg-val tnum" }, "฿" + fmt(shMap[b.name])),
-          )))
-      : h("div", { class: "combo-legend", style: { marginTop: "8px" } },
-          h("span", null, h("i", { style: { background: "#86B6E8" } }), "ยอดขายรายวัน"),
-          h("span", { style: { color: "#7C3AED" } }, h("i", { style: { background: "currentColor" } }), "รายได้สะสม"));
-
-    chartCard.replaceChildren(
-      h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "ภาพรวมยอดขายทุกร้าน"), sel),
-      secTitle(pieTitle, pieSub),
-      pieRow,
-      !multiShop && h("div", { style: { fontSize: "10.5px", color: "var(--faint)", marginTop: "-2px" } }, "เปิดอีกร้านแล้วเลือกร้านก่อนบันทึกรายได้ — กราฟจะแยกสัดส่วน % ต่อร้านให้อัตโนมัติ"),
-      h("div", { class: "chart-divider" }),
-      secTitle("ยอดขายรายวัน + รายได้สะสม", multiShop ? "แท่ง=แยกร้าน · เส้น=สะสม" : "แท่ง=รายวัน · เส้น=สะสม"),
-      h("div", { class: "chart-box" }, comboEl),
-      barLegend,
-      h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) },
-        pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
-    );
-  }
-  paintChart();
+  const trendCard = h("div", { class: "card sales-card" },
+    h("div", { class: "sales-head" }, h("span", { class: "sales-title" }, "แนวโน้มรายได้รวม"), h("span", { class: "badge", style: { background: "var(--surface-soft)" } }, pi("cal", 12), "เดือนนี้")),
+    series.length
+      ? [h("div", { class: "chart-box" }, branchCombo({ days: series, branches: [{ name: "รายได้", color: "#2BB3A3" }], h: 168, fmt, cycleColors: ["#2BB3A3"], lineColor: "#7C3AED" })),
+         h("div", { class: "combo-legend", style: { marginTop: "8px" } },
+           h("span", null, h("i", { style: { background: "#2BB3A3" } }), "รายได้รายวัน"),
+           h("span", { style: { color: "#7C3AED" } }, h("i", { style: { background: "currentColor" } }), "รายได้สะสม"))]
+      : h("div", { style: { padding: "26px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px" } }, "ยังไม่มีข้อมูล — บันทึกรายได้แล้วกราฟจะขึ้นจริง"),
+    h("button", { type: "button", class: "btn btn-block sales-report-btn", onClick: () => go({ name: "execsummary" }) }, pi("doc", 16), "ดูรายงานทั้งหมด", pi("chev", 14)),
+  );
 
   return [
-    h("div", { class: "stat-pair" },
-      statCard("sc-sales", "", "trend", "ยอดขายวันนี้", "฿" + fmt(todayTotal), "วันนี้ · " + TODAY.d + " " + TODAY.mon, "execsummary"),
-      statCard("sc-net", "net", "wallet", "ยอดสุทธิเดือนนี้", netStr, "รายได้ − ค่าใช้จ่าย = กำไร", "money"),
-    ),
-    chartCard,
+    statRow,
+    h("div", { class: "dash-h" }, pi("heart", 14), "ภาพรวมแต่ละร้าน"),
+    storeCards,
+    pairRow,
+    trendCard,
   ];
 }
 
