@@ -78,7 +78,7 @@ export function comboChart({ daily, target, breakeven }) {
 }
 
 /* ---------- แท่งย้อนหลัง 30 วัน (วันนี้ทึบ · ย้อนหลังพาสเทล) ---------- */
-export function miniBars(data, { solid = "#F76CA0", soft = "#FAD6E4", h = 88 } = {}) {
+export function miniBars(data, { solid = "#4FB985", soft = "#CDEBD9", h = 88 } = {}) {
   const W = 320, H = h, padB = 14, padT = 6;
   const n = data.length;
   const max = Math.max(...data.map((d) => d.v)) || 1;
@@ -140,7 +140,7 @@ export function pieChart(segs, { size = 132, thickness = 26 } = {}) {
 }
 
 /* ---------- แท่งเดี่ยว: ยอดขายรวมรายวัน (สเกลของตัวเอง) ---------- */
-export function barChart(data, { h = 118, color = "#F76CA0" } = {}) {
+export function barChart(data, { h = 118, color = "#7BC8A0" } = {}) {
   const W = 320, H = h, padT = 12, padB = 18, padR = 4, padL = 22;
   const n = data.length || 1;
   const max = niceCeil(Math.max(...data.map((d) => d.v), 1));
@@ -296,5 +296,78 @@ export function branchCombo({ days, branches, h = 168, fmt = (x) => x, cycleColo
   const endTx = svgEl("text", { class: "combo-end", x: W - padR, y: Math.max(padT - 8, cumPts[n - 1][1] - 7), "text-anchor": "end" });
   endTx.textContent = "฿" + fmt(cumTotal);
   svg.appendChild(endTx);
+  return svg;
+}
+
+/* ---------- แนวโน้มรายได้ 2 ชนิด/2 ฐาน ----------
+   • แท่ง (แกนซ้าย) = รายได้สุทธิรายวัน · เดือนนี้ = เขียวเข้ม · เดือนก่อน = เขียวจาง
+   • เส้น (แกนขวา, คนละฐาน) = รายได้สะสมทั้งปี (YTD)
+   • เส้นประ = จุดคุ้มทุน/วัน (แกนซ้าย)
+   days = [{ label, net, cur, cum }] · breakeven = บาท/วัน */
+export function revenueYtdCombo({ days, breakeven = 0, h = 210, fmt = (x) => x } = {}) {
+  const W = 348, H = h, padL = 30, padR = 44, padT = 26, padB = 22;
+  const n = days.length || 1;
+  const innerW = W - padL - padR;
+  const x = (i) => padL + (n <= 1 ? innerW / 2 : (i * innerW) / (n - 1));
+  const gap = Math.min(5, innerW / n * 0.28);
+  const bw = Math.max(4, (innerW - gap * (n - 1)) / n);
+
+  // แกนซ้าย = รายได้/วัน (รวมเส้นคุ้มทุนในสเกลด้วย)
+  const dmax = niceCeil(Math.max(...days.map((d) => d.net), breakeven, 1) * 1.12);
+  // แกนขวา = ยอดสะสม YTD (ช่วงค่าจริงของหน้าต่าง 30 วัน)
+  const cvals = days.map((d) => d.cum || 0);
+  const cHi = Math.max(...cvals, 1), cLo = Math.min(...cvals, 0);
+  const cStep = niceCeil((cHi - cLo) / 3) || 1;
+  const cBot = Math.floor(cLo / cStep) * cStep;
+  const cTop = Math.ceil(cHi / cStep) * cStep;
+  const cSpan = (cTop - cBot) || 1;
+  const base = H - padB;
+  const yL = (v) => padT + (1 - v / dmax) * (H - padT - padB);
+  const yR = (v) => padT + (1 - (v - cBot) / cSpan) * (H - padT - padB);
+
+  const svg = svgEl("svg", { class: "combo", viewBox: `0 0 ${W} ${H}` });
+  svg.style.height = H + "px";
+
+  // กริดแนวนอน + ป้ายแกนซ้าย (บาท/วัน) และแกนขวา (สะสม K)
+  [0, 0.5, 1].forEach((t) => {
+    const gy = padT + (1 - t) * (H - padT - padB);
+    svg.appendChild(svgEl("line", { class: t === 0 ? "axis" : "grid-r", x1: padL, y1: gy, x2: W - padR, y2: gy }));
+    const lL = svgEl("text", { class: "tick-r", x: padL - 4, y: gy + 3, "text-anchor": "end" });
+    lL.textContent = kLabel(dmax * t); svg.appendChild(lL);
+    const lR = svgEl("text", { class: "tick-r", x: W - padR + 4, y: gy + 3 });
+    lR.textContent = kLabel(cBot + cSpan * t); svg.appendChild(lR);
+  });
+
+  // แท่งรายได้สุทธิรายวัน
+  const every = Math.ceil(n / 6) || 1;
+  days.forEach((d, i) => {
+    const cx = x(i), yt = yL(d.net);
+    svg.appendChild(svgEl("rect", {
+      x: (cx - bw / 2).toFixed(1), y: yt.toFixed(1), width: bw.toFixed(1),
+      height: Math.max(0.8, base - yt).toFixed(1), rx: Math.min(2.5, bw / 2.5),
+      fill: d.cur ? "#2E9B63" : "#BEE3CE",
+    }));
+    if (i % every === 0 || i === n - 1) {
+      const t = svgEl("text", { class: "axis-lbl", x: cx, y: H - 6, "text-anchor": "middle" });
+      t.textContent = d.label; svg.appendChild(t);
+    }
+  });
+
+  // เส้นจุดคุ้มทุน (แกนซ้าย · เส้นประ)
+  if (breakeven > 0 && breakeven <= dmax) {
+    const by = yL(breakeven);
+    svg.appendChild(svgEl("line", { x1: padL, y1: by.toFixed(1), x2: W - padR, y2: by.toFixed(1), stroke: "#E8734E", "stroke-width": 1.4, "stroke-dasharray": "4 3" }));
+    const bt = svgEl("text", { class: "combo-cap", x: padL + 2, y: (by - 3).toFixed(1), fill: "#C8502B" });
+    bt.textContent = "คุ้มทุน ฿" + fmt(breakeven); svg.appendChild(bt);
+  }
+
+  // เส้นรายได้สะสม YTD (แกนขวา)
+  const pts = days.map((d, i) => [x(i), yR(d.cum || 0)]);
+  const path = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  svg.appendChild(svgEl("path", { d: path, fill: "none", stroke: "#3F86D6", "stroke-width": 2.6, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  const pe = pts[n - 1];
+  svg.appendChild(svgEl("circle", { cx: pe[0].toFixed(1), cy: pe[1].toFixed(1), r: 3.4, fill: "#3F86D6", stroke: "#fff", "stroke-width": 1.6 }));
+  const endTx = svgEl("text", { class: "combo-end", x: W - padR, y: Math.max(padT - 8, pe[1] - 8), "text-anchor": "end", fill: "#2E6BB0" });
+  endTx.textContent = "สะสม ฿" + fmt(Math.round(days[n - 1].cum || 0)); svg.appendChild(endTx);
   return svg;
 }

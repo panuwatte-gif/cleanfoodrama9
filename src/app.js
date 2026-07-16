@@ -34,6 +34,9 @@ import { stockListScreen } from "./pages/stocklist.js";
 import { alertSettingsScreen } from "./pages/alerts.js";
 import { stockDetailScreen } from "./pages/stockdetail.js";
 import { masterScreen } from "./pages/master.js";
+import { rawCostScreen } from "./pages/rawcost.js";
+import { menuCostScreen } from "./pages/menucost.js";
+import { salesAnalyticsScreen } from "./pages/salesanalytics.js";
 import { assumptionsScreen } from "./pages/assumptions.js";
 import { colorSettingsScreen } from "./pages/colorsettings.js";
 import { recipesScreen } from "./pages/recipes.js";
@@ -158,7 +161,7 @@ const shopCtx = {
   get canEdit() { return role() === "owner"; },
   setShop(name) { S.shop = name; save("shop", name); renderChrome(); },
   addShop() {
-    S.shops = [...S.shops, { name: "สาขาใหม่ " + (S.shops.length + 1), soon: true }];
+    S.shops = [...S.shops, { name: "สาขาใหม่ " + (S.shops.length + 1) }];
     save("shops", S.shops); renderChrome();
   },
   renameShop(oldName, newName) {
@@ -167,6 +170,14 @@ const shopCtx = {
     if (S.shops.some((s) => s.name === nm && s.name !== oldName)) return false; // กันชื่อซ้ำ
     S.shops = S.shops.map((s) => (s.name === oldName ? { ...s, name: nm } : s));
     if (S.shop === oldName) { S.shop = nm; save("shop", nm); }
+    save("shops", S.shops);
+    renderChrome();
+    return true;
+  },
+  removeShop(name) {
+    if (S.shops.length <= 1) return false;           // เหลืออย่างน้อย 1 ร้าน
+    S.shops = S.shops.filter((s) => s.name !== name);
+    if (S.shop === name) { S.shop = S.shops[0].name; save("shop", S.shop); }
     save("shops", S.shops);
     renderChrome();
     return true;
@@ -186,7 +197,10 @@ function renderContent() {
       case "stocklist":     return stockListScreen({ ...sctx, low: r.low });
       case "alerts":        return alertSettingsScreen(sctx);
       case "stockdetail":   return stockDetailScreen({ ...sctx, id: r.id });
-      case "master":        return masterScreen(sctx);
+      case "master":        return masterScreen({ ...sctx, mode: r.mode });
+      case "rawcost":       return rawCostScreen(sctx);
+      case "menucost":      return menuCostScreen(sctx);
+      case "salesanalytics": return salesAnalyticsScreen(sctx);
       case "assumptions":   return assumptionsScreen(sctx);
       case "colorsettings": return colorSettingsScreen(sctx);
       case "recipes":       return recipesScreen(sctx);

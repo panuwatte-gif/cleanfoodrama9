@@ -20,6 +20,19 @@ import {
 const bold = (t) => h("b", null, t);
 const fst = { ctx: null, adding: false };
 const inp = (v, attrs = {}) => h("input", { class: "input", value: v != null ? String(v) : "", ...attrs });
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// บังคับผลรวมน้ำหนัก = 1.0 — "ตัวสุดท้าย" เป็นตัวปรับอัตโนมัติ (1 − ผลรวมตัวอื่น)
+function autoLastWeight(formula) {
+  const terms = formula.terms || [];
+  if (!terms.length) return;
+  const others = terms.slice(0, -1).reduce((s, t) => s + (parseFloat(t.weight) || 0), 0);
+  terms[terms.length - 1].weight = Math.max(0, round2(1 - others));
+}
+// ผลรวมน้ำหนักของตัวที่ "กรอกเอง" (ทุกตัวยกเว้นตัวสุดท้าย) — โชว์เตือนถ้าเกิน 1
+function manualWeightSum(formula) {
+  return round2((formula.terms || []).slice(0, -1).reduce((s, t) => s + (parseFloat(t.weight) || 0), 0));
+}
 
 // จานสีต่อสูตร (วนตาม index) — ให้แต่ละสูตรมีเอกลักษณ์เหมือน reference
 const FPAL = [
@@ -63,15 +76,31 @@ function exprNodes(formula, pal) {
 }
 
 /* ---- แถวปรับน้ำหนัก/วัน ของแต่ละ term ---- */
-function termEditRow(formula, t, root, pal) {
-  const wEl = inp(t.weight, { type: "text", inputMode: "decimal", class: "fs2-num" });
-  wEl.addEventListener("change", () => { t.weight = parseFloat(wEl.value) || 0; saveFormula(formula); paint(root); });
+//  isLast = ตัวสุดท้าย → น้ำหนักถูกล็อกให้ระบบคิดเอง (บังคับผลรวม = 1.0)
+function termEditRow(formula, t, root, pal, isLast) {
   // วันย้อนหลัง — dropdown (รวมค่าปัจจุบันเสมอ)
   const opts = Array.from(new Set([3, 7, 14, 28, t.days])).sort((a, b) => a - b);
   const dEl = h("select", { class: "fs2-sel" }, opts.map((o) => h("option", { value: o, selected: o === t.days }, o + " วัน")));
-  dEl.addEventListener("change", () => { t.days = Math.max(1, parseInt(dEl.value) || 1); saveFormula(formula); paint(root); });
+  dEl.addEventListener("change", () => { t.days = Math.max(1, parseInt(dEl.value) || 1); autoLastWeight(formula); saveFormula(formula); paint(root); });
+
+  let wField;
+  if (isLast) {
+    // ตัวปรับอัตโนมัติ — แสดงค่าอย่างเดียว แก้ไม่ได้
+    wField = h("div", { class: "fs2-fld" },
+      h("span", null, "น้ำหนัก (อัตโนมัติ)"),
+      h("div", { class: "fs2-num", style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", background: pal.soft, color: pal.ink, fontWeight: 800, cursor: "default" } },
+        pi("lock", 12), String(round2(t.weight))),
+    );
+  } else {
+    const wEl = inp(t.weight, { type: "text", inputMode: "decimal", class: "fs2-num" });
+    wEl.addEventListener("change", () => {
+      let v = parseFloat(wEl.value); if (!Number.isFinite(v) || v < 0) v = 0; if (v > 1) v = 1;
+      t.weight = round2(v); autoLastWeight(formula); saveFormula(formula); paint(root);
+    });
+    wField = h("div", { class: "fs2-fld" }, h("span", null, "น้ำหนัก"), wEl);
+  }
   return h("div", { class: "fs2-trow" },
-    h("div", { class: "fs2-fld" }, h("span", null, "น้ำหนัก"), wEl),
+    wField,
     h("div", { class: "fs2-fld grow" }, h("span", null, "วันย้อนหลัง"), dEl),
   );
 }
@@ -82,13 +111,19 @@ function formulaCard(formula, root, cfg, i) {
   const nameEl = h("input", { class: "fs2-name", value: formula.name });
   nameEl.addEventListener("change", () => { if (nameEl.value.trim()) { formula.name = nameEl.value.trim(); saveFormula(formula); } });
 
+  // บังคับผลรวมน้ำหนัก = 1.0 ก่อนแสดงผล (ตัวสุดท้ายคิดอัตโนมัติ)
+  if (formula.type !== "average") autoLastWeight(formula);
+  const nTerms = (formula.terms || []).length;
+
   const terms = formula.type === "average"
     ? (() => {
         const dEl = inp(formula.days, { type: "text", inputMode: "numeric", class: "fs2-num wide" });
         dEl.addEventListener("change", () => { formula.days = Math.max(1, parseInt(dEl.value) || 1); saveFormula(formula); paint(root); });
         return [h("div", { class: "fs2-trow" }, h("div", { class: "fs2-fld grow" }, h("span", null, "จำนวนวัน (เฉลี่ย)"), dEl))];
       })()
-    : (formula.terms || []).map((t) => termEditRow(formula, t, root, pal));
+    : (formula.terms || []).map((t, ti) => termEditRow(formula, t, root, pal, ti === nTerms - 1));
+
+  const overWeight = formula.type !== "average" && nTerms > 1 && manualWeightSum(formula) > 1;
 
   return h("div", { class: "fs2-card" + (active ? " on" : ""), style: { "--fc": pal.c, "--fcsoft": pal.soft, "--fcink": pal.ink } },
     h("div", { class: "fs2-card-h" },
@@ -98,6 +133,13 @@ function formulaCard(formula, root, cfg, i) {
     ),
     h("div", { class: "fs2-expr" }, ...exprNodes(formula, pal)),
     h("div", { class: "fs2-terms" }, ...terms),
+    formula.type !== "average" && nTerms > 1
+      ? h("div", { class: "fs2-note", style: overWeight ? { background: "var(--tint-rose)", color: "var(--danger-ink)" } : null },
+          h("span", null, overWeight ? "⚠" : "∑"),
+          h("span", null, overWeight
+            ? "น้ำหนักที่กรอกรวมเกิน 1.0 — ตัวสุดท้ายถูกตั้งเป็น 0 · ลดค่าตัวอื่นลง"
+            : "ระบบบังคับผลรวม = 1.0 · ตัวสุดท้ายคิดให้อัตโนมัติ (🔒) — กรอกเฉพาะตัวบน"))
+      : null,
     formula.note ? h("div", { class: "fs2-note" }, h("span", null, "ⓘ"), h("span", null, formula.note)) : null,
     h("div", { class: "fs2-card-foot" },
       h("span", { class: "fs2-open" }, pi("check", 12), "ใช้เฉพาะวันร้านเปิด"),

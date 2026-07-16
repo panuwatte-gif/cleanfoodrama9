@@ -52,6 +52,8 @@ const role = () => (st.ctx && st.ctx.role) === "owner" ? "เจ้าของ"
 
 export function masterScreen(ctx) {
   st.ctx = ctx;
+  // เปิดหน้ามาที่แท็บที่ระบุ (เช่น การ์ด "ต้นทุนวัตถุดิบ" → แท็บ "สั่งของ" ที่โชว์ ฿/หน่วย)
+  if (ctx.mode && MD_TABS.some((t) => t.v === ctx.mode)) { st.tab = ctx.mode; st.q = ""; st.openCat = "protein"; }
   const root = h("div", { class: "page-wrap", "data-screen-label": "master", style: { display: "flex", flexDirection: "column", flex: 1 } });
   root._sheets = h("div");
   paint(root);

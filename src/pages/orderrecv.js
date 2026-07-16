@@ -64,6 +64,11 @@ function paint(root) {
 
   const content = h("div", { class: "page stack", style: { paddingBottom: "12px" } },
     seg({ grow: true, value: st.mode, onChange: (v) => { st.mode = v; paint(root); }, options: [{ v: "order", t: "สั่งของ", ic: "send" }, { v: "recv", t: "รับของ", ic: "truck" }] }),
+    // ข้อมูลชุดเดียวกับ "ข้อมูลกลาง" — เจ้าของเพิ่ม/ลบ/แก้รายการได้ที่นั่น แล้วหน้านี้ใช้ตามทันที
+    ctx.role === "owner"
+      ? note([bold("รายการนี้ = ข้อมูลกลางชุดเดียว"), " — เพิ่ม / ลบ / แก้ชื่อ·ต้นทุน·หน่วย ทำได้ที่ ", bold("ข้อมูลกลาง"), " แล้วหน้าสั่ง/รับ/นับ/พยากรณ์ ใช้ชุดเดียวกันทันที"], { iconName: "db" })
+      : note(["กรอกจำนวนได้เลย · การ ", bold("เพิ่ม/ลบ/แก้รายการ"), " ทำที่ฝั่ง ", bold("เจ้าของ"), " (ข้อมูลกลาง)"], { iconName: "lock" }),
+    ctx.role === "owner" && h("button", { type: "button", class: "btn btn-block btn-primary", style: { marginTop: "-2px" }, onClick: () => ctx.go({ name: "master", mode: isOrder ? "order" : "recv" }) }, pi("edit", 16), "เพิ่ม / ลบ / แก้รายการสั่งของ (ข้อมูลกลาง)"),
     !isOrder && note(["สาขาหลักส่งมา ", bold("14 รายการ"), " · แจ้งใน LINE แล้ว — เช็คของจริงแล้วกรอกจำนวนที่รับ"], { iconName: "truck" }),
     searchBox({ value: st.q, onChange: (v) => { st.q = v; paint(root); }, placeholder: "ค้นหา… (ไม่ต้องใส่หน่วยหมด)" }),
     menuTabs({ cats: oc, top: st.top, sub: st.sub, onTop, onSub }),

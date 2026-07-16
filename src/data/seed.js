@@ -38,6 +38,10 @@ export const TOMORROW = Object.assign(_mkDay(_TMR), {
 
 /* ---------- หมวด + หมวดย่อย (master — ทุกหน้าเรียงตามนี้) ---------- */
 export const CATS_SEED = [
+  { id: 'raw',   name: 'วัตถุดิบ (เนื้อ·ซอส·เครื่องปรุง)', unit: 'kg', icon: 'cow', tint: 'green', subs: [
+    { id: 'rmeat',  name: 'เนื้อสัตว์ (฿/กก.)', icon: 'cow' },
+    { id: 'rsauce', name: 'ซอส (฿/กก.)',        icon: 'drop' },
+  ] },
   { id: 'protein', name: 'เมนูกับข้าว', unit: 'kg', icon: 'pan', tint: 'green', subs: [
     { id: 'beef',    name: 'เนื้อ', icon: 'cow' },
     { id: 'pork',    name: 'หมู',  icon: 'pig' },
@@ -64,6 +68,21 @@ export const CATS_SEED = [
 
 /* ลำดับใน array = ลำดับมาตรฐานทุกหน้า · spicy:true = มีช่อง เผ็ด/ไม่เผ็ด */
 export const ITEMS_SEED = [
+  // ---- วัตถุดิบดิบ (ต้นทุน ฿/กก.) — เนื้อสัตว์ + ซอส · yield = ส่วนใช้ได้จริงหลังตัดแต่ง/สูญเสีย
+  //      ต้นทุนสุทธิ = ราคาซื้อ ÷ (yield/100) + ค่าส่ง + ค่าใช้จ่ายอื่น (คิดต่อ กก.)
+  { id: 'rw-chickskin', cat: 'raw', sub: 'rmeat',  name: 'อกไก่มีหนัง',      unit: 'kg', spicy: false, cost: 72,  yield: 85, ship: 5, other: 0, icon: 'chicken' },
+  { id: 'rw-tender',    cat: 'raw', sub: 'rmeat',  name: 'สันในไก่',         unit: 'kg', spicy: false, cost: 92,  yield: 95, ship: 5, other: 0, icon: 'chicken' },
+  { id: 'rw-porkloin',  cat: 'raw', sub: 'rmeat',  name: 'หมูสันนอกสไลด์',   unit: 'kg', spicy: false, cost: 135, yield: 92, ship: 5, other: 0, icon: 'pig' },
+  { id: 'rw-beefmince', cat: 'raw', sub: 'rmeat',  name: 'เนื้อวัวบด',       unit: 'kg', spicy: false, cost: 165, yield: 98, ship: 5, other: 0, icon: 'cow' },
+  { id: 'rw-duckmince', cat: 'raw', sub: 'rmeat',  name: 'เนื้อเป็ดบด',      unit: 'kg', spicy: false, cost: 120, yield: 97, ship: 5, other: 0, icon: 'duck' },
+  { id: 'rw-salmon',    cat: 'raw', sub: 'rmeat',  name: 'แซลมอน',           unit: 'kg', spicy: false, cost: 130, yield: 75, ship: 8, other: 0, icon: 'fish' },
+  { id: 'rw-hokke',     cat: 'raw', sub: 'rmeat',  name: 'ฮอกเกะ',           unit: 'kg', spicy: false, cost: 110, yield: 80, ship: 8, other: 0, icon: 'fish' },
+  { id: 'rw-shrimpS',   cat: 'raw', sub: 'rmeat',  name: 'กุ้งเล็ก',          unit: 'kg', spicy: false, cost: 230, yield: 60, ship: 8, other: 0, icon: 'shrimp' },
+  { id: 'rw-shrimpM',   cat: 'raw', sub: 'rmeat',  name: 'กุ้งกลาง',          unit: 'kg', spicy: false, cost: 290, yield: 62, ship: 8, other: 0, icon: 'shrimp' },
+  { id: 'rw-shrimpL',   cat: 'raw', sub: 'rmeat',  name: 'กุ้งใหญ่',          unit: 'kg', spicy: false, cost: 275, yield: 65, ship: 8, other: 0, icon: 'shrimp' },
+  { id: 'rw-sc-kaprao', cat: 'raw', sub: 'rsauce', name: 'ซอสกะเพรา',        unit: 'kg', spicy: false, cost: 4,   yield: 100, ship: 0, other: 0, icon: 'drop' },
+  { id: 'rw-sc-multi',  cat: 'raw', sub: 'rsauce', name: 'ซอสอเนกประสงค์',   unit: 'kg', spicy: false, cost: 4,   yield: 100, ship: 0, other: 0, icon: 'drop' },
+  { id: 'rw-sc-prikklua',cat:'raw', sub: 'rsauce', name: 'ซอสคั่วพริกเกลือ', unit: 'kg', spicy: false, cost: 8,   yield: 100, ship: 0, other: 0, icon: 'drop' },
   { id: 'kp-beef',    cat: 'protein', sub: 'beef',    name: 'กะเพราเนื้อ',       unit: 'kg', spicy: true,  cost: 320 },
   { id: 'beef-salt',  cat: 'protein', sub: 'beef',    name: 'เนื้อคั่วพริกเกลือ', unit: 'kg', spicy: false, cost: 330 },
   { id: 'kp-duck',    cat: 'protein', sub: 'duck',    name: 'กะเพราเป็ด',        unit: 'kg', spicy: true,  cost: 260 },
@@ -84,7 +103,7 @@ export const ITEMS_SEED = [
   { id: 'dr-thaipis', cat: 'drink', sub: 'low', name: 'ชาไทยมะพร้าวพิทาชิโอ้', unit: 'ขวด', spicy: false, cost: 42 },
   { id: 'dr-thaipi2', cat: 'drink', sub: 'low', name: 'ชาไทยพิทาชิโอ้',        unit: 'ขวด', spicy: false, cost: 40 },
   { id: 'dr-matchap', cat: 'drink', sub: 'low', name: 'Matcha Pistachio',      unit: 'ขวด', spicy: false, cost: 45 },
-  { id: 'dr-grape',   cat: 'drink', sub: 'low', name: 'องุ่น',                  unit: 'ขวด', spicy: false, cost: 28 },
+  { id: 'dr-grape',   cat: 'drink', sub: 'low', name: 'ชาองุ่น',                unit: 'ขวด', spicy: false, cost: 28 },
   { id: 'dr-honeylem',cat: 'drink', sub: 'low', name: 'น้ำผึ้งเลม่อน',          unit: 'ขวด', spicy: false, cost: 30 },
   { id: 'dr-longan',  cat: 'drink', sub: 'low', name: 'น้ำลำไย',                unit: 'ขวด', spicy: false, cost: 25 },
   { id: 'dr-cocosug', cat: 'drink', sub: 'low', name: 'น้ำตาลมะพร้าวอ่อน',     unit: 'ขวด', spicy: false, cost: 27 },
@@ -148,6 +167,7 @@ export const ASSUMPTIONS_SEED = [
   { id: 'gp-grab',    grp: 'รายได้', name: 'GP Grab',    v: '30',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Grab (ตัวช่วยคิด GP)' },
   { id: 'gp-lineman', grp: 'รายได้', name: 'GP Lineman', v: '30',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Lineman' },
   { id: 'gp-shopee',  grp: 'รายได้', name: 'GP Shopee',  v: '28',  unit: '%', perShop: true, use: 'บันทึกรายได้ · ช่อง Shopee' },
+  { id: 'vat-plat',   grp: 'รายได้', name: 'VAT แพลตฟอร์ม', v: '7', unit: '%', perShop: true, use: 'บันทึกรายได้ · VAT ที่แพลตฟอร์มเก็บจากค่า GP (Grab/Lineman/Shopee)' },
   { id: 'mkt-pct',    grp: 'รายได้', name: 'ค่าการตลาดเริ่มต้น', v: '2.5', unit: '%', perShop: true, use: 'บันทึกรายได้ · ค่าการตลาด' },
   { id: 'low-days',   grp: 'เกณฑ์เตือนสต๊อก', name: 'เกณฑ์สต๊อกต่ำ (เหลือพอขายกี่วัน)', v: '2', unit: 'วัน', use: 'สถานะสต๊อก ต่ำ/ใกล้หมด/พอ · หน้าแรก + หน้าสต๊อก' },
   { id: 'egg-tray',   grp: 'หน่วย & การแปลง', name: 'ไข่ 1 แผง', v: '30', unit: 'ฟอง', use: 'แปลงหน่วย แผง → ฟอง (หน้าแปลงหน่วย)' },
@@ -290,6 +310,9 @@ export const RECIPES = [
   { id: 'rc-jaew', item: 'sc-jaew', name: 'น้ำจิ้มแจ่ว', yield: 'สูตรร้าน', unit: 'g', locked: false,
     ing: [['น้ำปลา', 200], ['มะขามเปียก', 120], ['น้ำตาลปี๊บ', 100], ['ข้าวคั่ว', 40], ['พริกป่น', 30]],
     method: ['ละลายมะขามเปียกกับน้ำปลา', 'ใส่น้ำตาลปี๊บ คนให้เข้ากัน', 'ใส่ข้าวคั่ว + พริกป่น ก่อนเสิร์ฟ'] },
+  { id: 'rc-riceberry', item: 'rice-berry', name: 'หุงข้าวไรซ์เบอรี่', yield: 'ข้าวหุงสูตรร้าน', unit: 'g', locked: false, water: 1.65,
+    ing: [['ข้าวหอมมะลิ', 55], ['ข้าวไรซ์เบอรี่', 45]],
+    method: ['ผสมข้าวหอมมะลิ 55% + ไรซ์เบอรี่ 45% (ตามสัดส่วนด้านบน)', 'ซาวข้าวเบา ๆ 1–2 น้ำ', 'ใส่น้ำอัตราส่วน ข้าว : น้ำ = 1 : 1.65 (ข้าวรวม 1000 ก. → น้ำ 1650 ก.)', 'หุงในหม้อ พักไอ 10 นาทีก่อนคุ้ยขึ้น'] },
 ];
 // เพลงร้าน — เริ่มจากว่างจริง (เพลงจริงมาจากการอัปโหลด → rama9_songs + Storage)
 export const SONGS = [];

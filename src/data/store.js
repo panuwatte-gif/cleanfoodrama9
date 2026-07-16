@@ -108,6 +108,17 @@ export function initData() {
     MENUS_SEED.filter((m) => /shrimp/.test(m.item || "")).forEach((seed) => { if (!(db.menus || []).some((m) => m.id === seed.id)) db.menus.push(clone(seed)); });
     save(DATA_KEY, db);
   }
+  // migration: หมวด "วัตถุดิบ" (raw) + รายการต้นทุนวัตถุดิบ (เนื้อสัตว์/ซอส) — self-heal idempotent
+  {
+    if (!(db.cats || []).some((c) => c.id === "raw")) {
+      const rawSeed = CATS_SEED.find((c) => c.id === "raw");
+      if (rawSeed) (db.cats = db.cats || []).unshift(clone(rawSeed));
+    }
+    ITEMS_SEED.filter((i) => i.cat === "raw").forEach((seed) => {
+      if (!(db.items || []).some((i) => i.id === seed.id)) db.items.push(clone(seed));
+    });
+    save(DATA_KEY, db);
+  }
   // migration เฟส 6: โครงงาน/ข้อความใหม่ (status submitted · due · notice/note)
   // ถ้ายังเป็นชุด seed เก่า (t-seed*) → แทนด้วยชุดเดโมใหม่ทั้งก้อน
   // migration: ลบงานเดโมเก่า (t-s0X / t-seed) — เริ่มจากว่างจริง

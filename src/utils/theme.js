@@ -7,10 +7,10 @@
 
 import { load, save } from "./storage.js";
 
-// ค่าเริ่มต้น = ชมพูพาสเทลนุ่ม (Soft Kawaii) — จับคู่ skin kawaii.css
+// ค่าเริ่มต้น = ฟ้าพาสเทล + เขียวพาสเทล (หลากสี) — เลิกใช้ชมพู
 export const COLOR_DEFAULTS = {
-  primary: "#F76CA0", secondary: "#8FB7F2", bg: "#FFF7FA", surface: "#FFFFFF",
-  text: "#4E3A45", warning: "#F4A64C", pending: "#F4A64C", fab: "#F76CA0",
+  primary: "#62A8EC", secondary: "#6FC79A", bg: "#F5F8FD", surface: "#FFFFFF",
+  text: "#3A4652", warning: "#F4A64C", pending: "#F4A64C", fab: "#62A8EC",
 };
 
 const hx = (c) => { c = c.replace("#", ""); if (c.length === 3) c = c.split("").map((x) => x + x).join(""); return [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16)); };
@@ -32,7 +32,7 @@ export function themeToVars(th) {
   };
 }
 
-const KEY = "theme:v2";   // bumped: palette switched green → kawaii pink (ignore stale v1)
+const KEY = "theme:v3";   // bumped: palette switched pink → pastel blue+green multicolor (ignore stale v1/v2)
 export function loadTheme() { return { ...COLOR_DEFAULTS, ...(load(KEY, {}) || {}) }; }
 export function saveTheme(theme) { save(KEY, theme); }
 

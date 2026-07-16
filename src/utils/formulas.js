@@ -334,6 +334,35 @@ export const recvMonth = () => {
 ==================================================================== */
 export const fixedMonthTotal = Object.values(COST_MODEL.fixedMonth).reduce((a, b) => a + b, 0);
 export const breakevenPerDay = Math.round((fixedMonthTotal / 30) / (1 - COST_MODEL.varRatio));
+
+/* จุดคุ้มทุน "ปรับได้จริง" — เจ้าของกรอกต้นทุนคงที่ + % ต้นทุนวัตถุดิบ + วันเปิด/เดือน
+   เก็บใน localStorage · ค่าเริ่มต้นดึงจาก COST_MODEL · คำนวณ auto = (คงที่/วัน) ÷ (1 − var%) */
+const BE_KEY = "be:v1";
+const _beNum = (v, dflt) => { const n = parseFloat(String(v).replace(/,/g, "")); return Number.isFinite(n) ? n : dflt; };
+export function beParams() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(BE_KEY) || "{}"); } catch (_) { s = {}; }
+  const fm = COST_MODEL.fixedMonth;
+  return {
+    rent:  _beNum(s.rent,  fm["ค่าเช่า"]),
+    labor: _beNum(s.labor, fm["ค่าแรงประจำ"]),
+    util:  _beNum(s.util,  fm["ค่าไฟ/น้ำ/เน็ต"]),
+    other: _beNum(s.other, fm["อื่นๆคงที่"]),
+    varPct: _beNum(s.varPct, Math.round(COST_MODEL.varRatio * 100)),
+    days:   _beNum(s.days, 30),
+  };
+}
+export function setBeParams(patch) {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(BE_KEY) || "{}"); } catch (_) { s = {}; }
+  try { localStorage.setItem(BE_KEY, JSON.stringify({ ...s, ...patch })); } catch (_) {}
+}
+export function beFixedMonth() { const p = beParams(); return p.rent + p.labor + p.util + p.other; }
+export function breakevenDaily() {
+  const p = beParams();
+  const v = Math.min(95, Math.max(0, p.varPct)) / 100;
+  return Math.round((beFixedMonth() / Math.max(1, p.days)) / (1 - v));
+}
 export const SALES_CUM = (() => {
   let acc = 0; const out = [];
   for (let d = 1; d <= TODAY.d; d++) { acc += (MONEY.days[d] ? MONEY.days[d].in : 0); out.push({ d, v: acc }); }

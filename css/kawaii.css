@@ -29,19 +29,19 @@
   --muted:         #A28D98;
   --faint:         #C5B1BB;
 
-  /* soft rose primary — gentler & less red than the old candy pink */
-  --primary:       #F58AB7;
-  --primary-dark:  #ED73A6;
-  --primary-deep:  #CF5C92;
-  --primary-soft:  #FCE4F0;
-  --primary-ink:   #A8497B;
-  --primary-tint:  #FFF4FA;
+  /* pastel blue primary — multicolor pastel palette (blue lead + green + accents) */
+  --primary:       #62A8EC;
+  --primary-dark:  #4A93DE;
+  --primary-deep:  #3D7AC0;
+  --primary-soft:  #E1EFFC;
+  --primary-ink:   #2E5E96;
+  --primary-tint:  #F1F7FE;
 
-  /* holding aliases → soft rose so legacy .skin-holding rules follow */
-  --hold-primary:  #F58AB7; --hold-deep: #CF5C92; --hold-bright: #FFA8CA;
-  --hold-soft:     #FCE4F0; --hold-ink:  #A8497B; --hold-accent: #F4B43C;
-  --b-primary:     #F58AB7; --b-primary-dk: #CF5C92; --b-bright: #FFBBD4;
-  --b-soft:        #FCE4F0; --b-accent: #F4B43C; --b-ink: #5A3F4A;
+  /* holding aliases → pastel blue so legacy .skin-holding rules follow */
+  --hold-primary:  #62A8EC; --hold-deep: #3D7AC0; --hold-bright: #8CC1F2;
+  --hold-soft:     #E1EFFC; --hold-ink:  #2E5E96; --hold-accent: #F4B43C;
+  --b-primary:     #62A8EC; --b-primary-dk: #3D7AC0; --b-bright: #8CC1F2;
+  --b-soft:        #E1EFFC; --b-accent: #F4B43C; --b-ink: #2E5E96;
 
   --border:        #EEE3F1;
   --border-soft:   #F3ECF7;
@@ -69,7 +69,7 @@
   --shadow-md: 0 8px 20px rgba(214,120,160,.14), 0 2px 5px rgba(214,120,160,.08);
   --shadow-lg: 0 20px 44px rgba(190,90,135,.20), 0 5px 14px rgba(190,90,135,.10);
   --shadow-nav: 0 -6px 26px rgba(214,120,160,.14), 0 2px 6px rgba(214,120,160,.06);
-  --shadow-brand: 0 8px 20px rgba(247,108,160,.34);
+  --shadow-brand: 0 8px 20px rgba(98,168,236,.34);
 
   --font-display: "Baloo Thai 2", "IBM Plex Sans Thai", system-ui, sans-serif;
   --font-script:  "Mali", "IBM Plex Sans Thai", cursive;
@@ -146,7 +146,7 @@ body::before {
 .catic.amber  { background: #FFF1D6; color: #B5781A; }
 .catic.blue   { background: #E5F0FD; color: #3F73B8; }
 .catic.violet { background: #F1E9FD; color: #7E59C9; }
-.catic.fill   { background: linear-gradient(180deg, var(--primary), var(--primary-dark)); box-shadow: 0 3px 9px rgba(247,108,160,.34); }
+.catic.fill   { background: linear-gradient(180deg, var(--primary), var(--primary-dark)); box-shadow: 0 3px 9px rgba(98,168,236,.34); }
 
 /* ---- 8) NOTE / EMPTY ---- */
 .note { border-radius: 16px; background: var(--primary-tint); border: 1.5px solid var(--primary-soft); color: var(--text-2); }

@@ -55,11 +55,12 @@ export function storeChip(ctx) {
       return h("div", { class: "store-rename-row" },
         inp,
         h("button", { type: "button", class: "store-rename-ok", "aria-label": "บันทึก", onClick: commit }, pi("check", 15)),
+        ctx.shops.length > 1 && h("button", { type: "button", class: "store-rename-x", "aria-label": "ลบร้านนี้", style: { color: "var(--danger)" }, onClick: () => { ctx.removeShop(s.name); } }, pi("trash", 14)),
         h("button", { type: "button", class: "store-rename-x", "aria-label": "ยกเลิก", onClick: () => { editing = null; render(); } }, "✕"),
       );
     };
 
-    // แถวรายการร้าน
+    // แถวรายการร้าน — ทุกร้านเลือกใช้งานได้ (เจ้าของลบร้านที่ไม่ใช้เองได้ที่ปุ่มแก้)
     const itemRow = (s) => h("div", { class: "store-menu-row" },
       h("button", {
         type: "button", role: "menuitem", class: "store-menu-item" + (ctx.shop === s.name ? " on" : ""),
@@ -68,7 +69,7 @@ export function storeChip(ctx) {
         h("span", { class: "catic sm " + (ctx.shop === s.name ? "fill" : "green") }, pi("store", 15)),
         h("span", { style: { flex: 1, minWidth: 0 } },
           h("span", { style: { display: "block", fontWeight: 700, fontSize: "13.5px" } }, s.name),
-          h("span", { style: { display: "block", fontSize: "11px", color: "var(--muted)" } }, s.soon ? "ยังไม่เปิด · เตรียมล่วงหน้าได้" : "เปิดขายอยู่"),
+          h("span", { style: { display: "block", fontSize: "11px", color: "var(--muted)" } }, "เปิดขายอยู่"),
         ),
         ctx.shop === s.name && (() => { const c = pi("check", 16); c.style.color = "var(--primary)"; return c; })(),
       ),

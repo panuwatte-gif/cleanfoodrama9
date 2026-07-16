@@ -13,8 +13,41 @@ import { hdr, note, tag } from "../components/components.js";
 import { storeChip } from "../components/layout.js";
 import { cats, menus, priceRows, items, alertOnOf } from "../data/store.js";
 import { catEmoji, stockOf } from "../utils/formulas.js";
+import { PEAK_DAILY, peakByHour } from "../data/peakhours.js";
 
 const bold = (t) => h("b", null, t);
+
+// การ์ดชั่วโมงพีค (Grab) — ยอดออเดอร์รายชั่วโมง + ทางเข้าหน้าวิเคราะห์เต็ม
+function peakHourCard(go) {
+  const hours = peakByHour();
+  const max = Math.max(...hours, 1);
+  const total = hours.reduce((a, b) => a + b, 0);
+  const ranked = hours.map((v, i) => ({ i, v })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 3);
+  const topSet = new Set(ranked.map((r) => r.i));
+  const hh = (i) => String(i).padStart(2, "0") + ":00";
+  const bars = h("div", { style: { display: "flex", alignItems: "flex-end", gap: "2px", height: "84px", padding: "4px 0" } },
+    hours.map((v, i) => {
+      const on = topSet.has(i);
+      return h("div", { title: hh(i) + " · " + v + " ออเดอร์", style: { flex: 1, height: Math.max(2, v / max * 100) + "%", background: on ? "var(--primary)" : "var(--primary-soft, #CDE9D6)", borderRadius: "3px 3px 0 0", minWidth: 0 } });
+    }),
+  );
+  const axis = h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "9.5px", color: "var(--faint)", marginTop: "3px" } },
+    ["00:00", "06:00", "12:00", "18:00", "23:00"].map((t) => h("span", null, t)));
+  const topTxt = ranked.map((r) => hh(r.i) + " (" + r.v + ")").join(" · ");
+  return h("button", { type: "button", class: "card list-press", style: { width: "100%", textAlign: "left", border: 0 }, onClick: () => go({ name: "salesanalytics" }) },
+    h("div", { class: "rowflex", style: { marginBottom: "8px" } },
+      h("span", { class: "catic amber" }, pi("trend", 18)),
+      h("div", { style: { flex: 1, minWidth: 0 } },
+        h("div", { style: { fontWeight: 700, fontSize: "15px" } }, "วิเคราะห์การขาย · Grab"),
+        h("div", { style: { fontSize: "12px", color: "var(--muted)" } }, "ขายดีรายวัน · รายชั่วโมง · เมนูขายดี — ข้อมูลจริง " + PEAK_DAILY.length + " วัน"),
+      ),
+      (() => { const c = pi("chev", 18); c.style.color = "var(--faint)"; return c; })(),
+    ),
+    bars, axis,
+    h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginTop: "9px", paddingTop: "9px", borderTop: "1px solid var(--border-soft)", fontSize: "12px", color: "var(--muted)" } },
+      pi("clock", 13), h("span", null, "ชั่วโมงพีค: "), bold(topTxt)),
+  );
+}
 
 // การ์ดลิงก์มาตรฐาน
 function linkCard(root, { iconName, tintCls = "green", title, sub, soft, onClick, right, extra }) {
@@ -51,6 +84,7 @@ export function dataScreen(ctx) {
   return h("div", { class: "page-wrap", "data-screen-label": "data" },
     hdr({ title: "ข้อมูล", sub: (shopCtx ? shopCtx.shop : "พระราม 9") + " · สต๊อก เมนู โภชนาการ — ชุดเดียวกับข้อมูลกลาง", right: shopCtx ? storeChip(shopCtx) : undefined }),
     h("div", { class: "page stack" },
+      peakHourCard(go),
       linkCard(null, {
         iconName: "box", tintCls: "fill",
         title: "ระยะเวลาสินค้าคงเหลือ & อายุสินค้าเก่า",

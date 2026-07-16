@@ -16,6 +16,7 @@ import { sheet } from "../components/sheet.js";
 import { priceRows, savePrice, removePrice } from "../data/store.js";
 import { PRICE_CATS, ADDON_CAT } from "../data/seed.js";
 import { fmt } from "../utils/formulas.js";
+import { menuThumb } from "../data/menuImages.js";
 
 const bold = (t) => h("b", null, t);
 const pst = { q: "", cat: "all", ctx: null, edit: null };
@@ -77,7 +78,7 @@ function priceRow(r, root, idx, lastIdx) {
 
   return h("div", { class: "card split", style: { padding: "10px 12px 10px 14px", cursor: owner ? "pointer" : "default" }, onClick: owner ? () => openEdit(r, root) : undefined },
     h("div", { class: "rowflex", style: { minWidth: 0, flex: 1, gap: "10px" } },
-      h("span", { class: "catic " + (addon ? "amber" : "green"), style: { flex: "none" } }, pi(addon ? "plus" : "tag", 16)),
+      (!addon && menuThumb(r.dish, 42, { borderRadius: "12px" })) || h("span", { class: "catic " + (addon ? "amber" : "green"), style: { flex: "none" } }, pi(addon ? "plus" : "tag", 16)),
       h("div", { style: { minWidth: 0 } },
         h("div", { style: { fontWeight: 700, fontSize: "13.5px" } }, r.dish || "—"),
         h("div", { class: "rowflex", style: { gap: "7px", marginTop: "2px", flexWrap: "wrap" } },

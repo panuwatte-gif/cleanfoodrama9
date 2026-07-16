@@ -30,12 +30,14 @@ function scalableRecipe(r, ctx) {
   const pct = (g) => Math.round((g / baseTotal) * 1000) / 10;
   const fields = [];
   let totalInput = null;
+  let waterEl = null;
   const chips = [];
 
   const refresh = (exceptIdx) => {
     if (totalInput && exceptIdx !== -1) totalInput.value = fmtG(baseTotal * scale);
     fields.forEach(({ idx, input }) => { if (idx !== exceptIdx) input.value = fmtG(r.ing[idx][1] * scale); });
     chips.forEach((c) => c.el.classList.toggle("active", Math.abs(scale - c.m) < 0.001));
+    if (waterEl) waterEl.textContent = fmtG(baseTotal * scale * r.water) + " " + r.unit;
   };
   const onEdit = (idx, input) => {
     const s = input.value.replace(/[^0-9.]/g, ""); if (s !== input.value) input.value = s;
@@ -65,11 +67,18 @@ function scalableRecipe(r, ctx) {
       ),
       mkField(-1, true),
     ),
-    h("div", { class: "overline", style: { margin: "12px 0 4px" } }, "ส่วนผสม (ตามสัดส่วน)"),
+    h("div", { class: "overline", style: { margin: "12px 0 4px" } }, r.water ? "สัดส่วนชนิดข้าว (ตามสัดส่วน)" : "ส่วนผสม (ตามสัดส่วน)"),
     r.ing.map(([n], i) => h("div", { class: "rcp-row" },
       h("span", { class: "rcp-name" }, n, h("span", { class: "rcp-pct" }, pct(r.ing[i][1]) + "%")),
       mkField(i),
     )),
+    r.water ? h("div", { class: "rcp-total", style: { marginTop: "10px", background: "var(--primary-tint)", borderColor: "var(--primary-soft)" } },
+      h("div", { style: { minWidth: 0 } },
+        h("div", { class: "overline", style: { color: "var(--primary-dark)" } }, "น้ำที่ต้องใช้"),
+        h("div", { style: { fontSize: "11px", color: "var(--muted)", marginTop: "1px" } }, "ข้าว : น้ำ = 1 : " + r.water + " (คิดจากข้าวรวม)"),
+      ),
+      h("div", { class: "rcp-field big" }, (waterEl = h("span", { class: "tnum", style: { fontWeight: 800, color: "var(--primary-dark)" } }, fmtG(baseTotal * r.water) + " " + r.unit))),
+    ) : null,
     chipRow,
     r.method && r.method.length > 0 && h("div", null,
       h("div", { class: "overline", style: { margin: "14px 0 6px" } }, "วิธีทำ / วิธีดอง"),
@@ -84,10 +93,23 @@ function scalableRecipe(r, ctx) {
   );
 }
 
-// ---- โหมดแก้สูตรจริง (เจ้าของ) — แก้สัดส่วน/ชื่อ/วิธีทำ แล้วบันทึก ----
+// ---- โหมดแก้สูตรจริง (เจ้าของ) — แก้ชื่อ/สัดส่วน/วิธีทำ + อัตราส่วนน้ำ (สูตรหุงข้าว) แล้วบันทึก ----
 function recipeEditor(r, ctx) {
   const root = ctx._root;
   const save = () => { saveRecipe({ ...r }); ctx.toast('บันทึกสูตร "' + r.name + '" แล้ว'); };
+
+  // ชื่อสูตร (แก้ได้ทั้งสูตรใหม่และของเดิม) + คำอธิบายสั้น (yield)
+  const nameIn = h("input", { type: "text", class: "input", value: r.name || "", placeholder: "ชื่อสูตร เช่น หุงข้าวไรซ์เบอรี่", style: { fontSize: "15px", fontWeight: 700 } });
+  nameIn.addEventListener("input", () => { r.name = nameIn.value; });
+  nameIn.addEventListener("blur", () => { r.name = (r.name || "").trim() || "สูตรใหม่"; save(); paint(root, ctx); });
+  const yieldIn = h("input", { type: "text", class: "input", value: r.yield || "", placeholder: "เช่น สูตรร้าน / ได้ 4 ที่" });
+  yieldIn.addEventListener("input", () => { r.yield = yieldIn.value; });
+  yieldIn.addEventListener("blur", save);
+
+  // อัตราส่วนน้ำ (สำหรับสูตรหุงข้าว) — ข้าว : น้ำ = 1 : water · เว้นว่าง = ไม่ใช่สูตรหุงข้าว
+  const waterIn = h("input", { type: "text", inputMode: "decimal", class: "input tnum", value: r.water != null ? String(r.water) : "", placeholder: "เช่น 1.65", style: { width: "90px", textAlign: "center", flex: "none" } });
+  waterIn.addEventListener("input", () => { const s = waterIn.value.replace(/[^0-9.]/g, ""); if (s !== waterIn.value) waterIn.value = s; });
+  waterIn.addEventListener("blur", () => { const v = parseFloat(waterIn.value); r.water = Number.isFinite(v) && v > 0 ? v : undefined; save(); paint(root, ctx); });
 
   const ingRows = r.ing.map((ig, i) => {
     const nameIn = h("input", { type: "text", class: "input", value: ig[0], placeholder: "ชื่อส่วนผสม", style: { fontSize: "13.5px", flex: 1, minWidth: 0 } });
@@ -118,7 +140,26 @@ function recipeEditor(r, ctx) {
   });
 
   return h("div", { style: { padding: "2px 14px 14px" } },
-    h("div", { class: "overline", style: { margin: "6px 0 6px" } }, "ส่วนผสม (สัดส่วนฐาน · " + r.unit + ")"),
+    h("div", { class: "overline", style: { margin: "6px 0 6px" } }, "ชื่อสูตร"),
+    h("div", { class: "stack", style: { gap: "8px" } },
+      nameIn,
+      h("label", { class: "stack", style: { gap: "4px" } },
+        h("span", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "คำอธิบายสั้น (ได้ปริมาณ/ใช้ทำ)"),
+        yieldIn,
+      ),
+    ),
+
+    h("div", { class: "overline", style: { margin: "16px 0 6px" } }, "อัตราส่วนน้ำ (สูตรหุงข้าว)"),
+    h("div", { class: "card", style: { padding: "10px 12px" } },
+      h("div", { class: "rowflex", style: { gap: "8px", alignItems: "center" } },
+        h("span", { style: { flex: 1, fontSize: "13px" } }, "ข้าว : น้ำ = 1 :"),
+        waterIn,
+      ),
+      h("div", { style: { fontSize: "11.5px", color: "var(--faint)", marginTop: "6px", lineHeight: 1.5 } },
+        r.water ? ("ข้าวรวม 1000 ก. → น้ำ " + Math.round(1000 * r.water) + " ก. · เว้นว่าง = ไม่ใช่สูตรหุงข้าว") : "เว้นว่างถ้าไม่ใช่สูตรหุงข้าว · ใส่ตัวเลข เช่น 1.65 = น้ำ 1.65 เท่าของข้าว"),
+    ),
+
+    h("div", { class: "overline", style: { margin: "16px 0 6px" } }, (r.water ? "สัดส่วนชนิดข้าว (%)" : "ส่วนผสม") + " (สัดส่วนฐาน · " + r.unit + ")"),
     h("div", { class: "stack", style: { gap: "8px" } }, ingRows),
     h("button", { type: "button", class: "btn btn-block", style: { marginTop: "10px" }, onClick: () => { r.ing.push(["ส่วนผสมใหม่", 100]); save(); paint(root, ctx); } }, pi("plus", 14), "เพิ่มส่วนผสม"),
 
