@@ -270,7 +270,10 @@ export const WEEK7 = (() => {
 export const fc7 = (id) => {
   const it = itemById(id); if (!it) return null;
   const u = unitOf(it);
-  const b = baseFor(it);
+  // ★ ฐานพยากรณ์ = "ยอดขายจริง" เฉลี่ย/วัน (จาก ledger salesRows · หน้าต่าง 30 วันล่าสุด)
+  //   ไม่มีข้อมูลขายจริง = ไม่พยากรณ์ (คืน null) — กันตัวเลขมั่วของรายการที่ไม่เคยขาย
+  const b = avgDailyUse(id);
+  if (!(b > 0)) return null;
   // assumption ที่ผูกกับสูตรพยากรณ์ (แก้ในหน้า "ปรับค่า assumption")
   //  • fc-window = ใช้ข้อมูลย้อนหลังกี่เดือน → ยิ่งมาก ช่วงคาดการณ์ยิ่งแคบ (มั่นใจขึ้น)
   //  • order-buf = เผื่อความปลอดภัยใบสั่งของ (%) → ใช้คำนวณ "แนะนำสั่ง"
@@ -278,11 +281,13 @@ export const fc7 = (id) => {
   const winF = Math.min(1.6, Math.max(0.6, 3 / win));
   const buf = Math.max(0, assume("order-buf", 10)) / 100;
   const spread = (0.12 + (_hash(it.id) % 7) / 100) * winF;
+  // ★ ปัดแบบ "ตรงจริง" — เก็บ 2 ตำแหน่ง ไม่ปัดขึ้นขั้นต่ำเป็น 1 (ของขายน้อย <1/วัน จะได้ไม่โป่งเป็น 1)
+  const rq = (n) => Math.round(n * 100) / 100;
   const days = WEEK7.map((wd) => {
     const f = DOW_FACTOR[wd.full] || 1;
     const center = b * f;
-    const lo = _round(center * (1 - spread), u);
-    const hi = _round(center * (1 + spread), u);
+    const lo = rq(center * (1 - spread));
+    const hi = rq(center * (1 + spread));
     const mid = Math.round(((lo + hi) / 2) * 100) / 100;
     const conf = Math.max(70, Math.round((spread < 0.15 ? 89 : 84) - wd.i * 1.5 + (_hash(it.id + wd.full) % 3)));
     return { ...wd, lo, hi, mid, conf };
@@ -291,10 +296,10 @@ export const fc7 = (id) => {
   const max = Math.max(...days.map((d) => d.hi));
   const wsum = days.reduce((a, d) => a + d.conf, 0);
   const wavgRaw = days.reduce((a, d) => a + d.mid * d.conf, 0) / wsum;
-  const wavg = u === "kg" ? Math.round(wavgRaw * 100) / 100 : Math.round(wavgRaw);
-  // แนะนำสั่ง/วัน = ค่าเฉลี่ยถ่วง + เผื่อความปลอดภัย (order-buf)
+  const wavg = Math.round(wavgRaw * 100) / 100;
+  // แนะนำสั่ง/วัน = ค่าเฉลี่ยถ่วง + เผื่อความปลอดภัย (order-buf) · ของนับชิ้น ปัดขึ้นอย่างน้อย 1 (สั่งเป็นชิ้น)
   const recRaw = wavg * (1 + buf);
-  const rec = u === "kg" ? Math.round(recRaw * 100) / 100 : Math.max(1, Math.round(recRaw));
+  const rec = u === "kg" ? Math.round(recRaw * 100) / 100 : (recRaw > 0 ? Math.max(1, Math.round(recRaw)) : 0);
   const prob = Math.round(wsum / days.length);
   return { u, days, min, max, wavg, rec, bufPct: Math.round(buf * 100), prob, conf: prob >= 85 ? "สูง" : prob >= 78 ? "กลาง" : "พอใช้" };
 };

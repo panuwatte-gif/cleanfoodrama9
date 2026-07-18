@@ -27,6 +27,8 @@ import { incomeRows, expenseRows, items as allItems } from "../data/store.js";
 import { load, save } from "../utils/storage.js";
 import { PEAK_DAILY } from "../data/peakhours.js";
 import { GRAB_DAILY, grabMonth, menuShare } from "../data/grabData.js";
+import { menuDaily as gMenuDaily, menuItems as gMenuItems } from "../data/grabStore.js";
+import { breakevenScenarios, breakevenNetSalesPerDay } from "../services/grabReportService.js";
 
 const MONTH_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const WD_FULL = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
@@ -269,28 +271,65 @@ function ownerSalesBlock(go, shopCtx) {
   // ---- คาดการณ์การขายแต่ละเมนู · วันนี้ (ข้อมูลพยากรณ์ชุดเดียวกับ "คำแนะนำการเตรียมของ") ----
   const fcMenuCard = dailyMenuForecastCard(go);
 
-  // ---- โครงสร้างรายได้ (โดนัท · เดือนนี้) — สุทธิ / ค่าธรรมเนียม+GP / โฆษณา (ข้อมูลจริง) ----
-  const fees = Math.max(0, mGross - mNet - mAds);
-  const segs = [
-    { label: "ที่ร้านได้ (สุทธิ)", value: mNet, color: "#5FBE7D" },
-    { label: "ค่า GP + ธรรมเนียม", value: fees, color: "#F4A64C" },
-    { label: "ค่าโฆษณา", value: mAds, color: "#A98BE0" },
-  ].filter((s) => s.value > 0);
-  const grossAll = segs.reduce((a, s) => a + s.value, 0) || 1;
-  const donutCard = h("div", { class: "card dash-card" },
-    h("div", { class: "dash-card-h" }, "โครงสร้างรายได้ (" + mLabel + ")"),
-    h("div", { class: "pie-row" },
-      segs.length ? pieChart(segs, { size: 104, thickness: 20 }) : h("div", { style: { fontSize: "12px", color: "var(--faint)", padding: "20px 0" } }, "ยังไม่มียอดขาย"),
-      h("div", { class: "pie-legend" }, segs.map((s) => h("div", { class: "pie-leg-item" },
-        h("span", { class: "pie-dot", style: { background: s.color } }),
-        h("span", { class: "pie-leg-name" }, s.label),
-        h("span", { class: "pie-leg-pct tnum" }, Math.round(s.value / grossAll * 100) + "%"))))),
+  // ---- โครงสร้างรายได้ "ตามร้าน" (เดือนนี้) — วงใหญ่ = ร้าน · ด้านใน % แพลตฟอร์มต่อร้าน ----
+  // เพิ่มร้าน/แพลตฟอร์มใหม่ → ชาร์ตปรับเองอัตโนมัติ (อิงรายชื่อร้านจาก shopCtx)
+  const STORE_COLORS = ["#5FBE7D", "#7FB5E3", "#B9A7E6", "#F2C46B", "#F0A8C4"];
+  const platRev = names.map((nm, i) => ({
+    store: nm, color: STORE_COLORS[i % STORE_COLORS.length],
+    // ตอนนี้มีข้อมูลจริงเฉพาะ พระราม9×Grab — ร้าน/แพลตฟอร์มใหม่เข้าระบบเมื่อไหร่ เติมยอดที่นี่ผ่านชั้นข้อมูล
+    platforms: i === 0 ? { "Grab": mNet, "LINE MAN": 0 } : { "Grab": 0, "LINE MAN": 0 },
+  }));
+  const storeSegs = platRev.map((s) => ({ label: s.store, value: Object.values(s.platforms).reduce((a, b) => a + b, 0), color: s.color }));
+  const liveSegs = storeSegs.filter((s) => s.value > 0);
+  const totalRev = storeSegs.reduce((a, s) => a + s.value, 0) || 1;
+  // จำกัดความยาว: โชว์ไม่เกิน 4 ร้าน · ที่เหลือยุบเป็น "+N ร้านอื่น"
+  const MAX_LEG = 4;
+  const legRows = platRev.map((s) => {
+    const tot = Object.values(s.platforms).reduce((a, b) => a + b, 0);
+    return { name: s.store, color: s.color, pct: Math.round(tot / totalRev * 100) };
+  });
+  const shownLeg = legRows.slice(0, MAX_LEG), restLeg = legRows.slice(MAX_LEG);
+  const restPct = restLeg.reduce((a, r) => a + r.pct, 0);
+  const legItem = (dot, name, pct, muted) => h("div", { style: { display: "flex", alignItems: "center", gap: "6px" } },
+    h("span", { class: "pie-dot", style: { background: dot, width: "8px", height: "8px", flex: "none" } }),
+    h("span", { style: { flex: 1, minWidth: 0, fontSize: "11px", fontWeight: 700, color: muted ? "var(--muted)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, name),
+    h("span", { class: "pie-leg-pct tnum", style: { fontSize: "11px" } }, pct + "%"));
+  const donutCard = h("div", { class: "card dash-card", style: { background: "linear-gradient(150deg,#FBF2FB 0%,#F1F0FE 100%)", borderColor: "#ECE0F3", padding: "13px 12px" } },
+    h("div", { class: "dash-card-h", style: { fontSize: "12.5px", marginBottom: "10px" } }, "โครงสร้างรายได้"),
+    liveSegs.length
+      ? h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "11px" } },
+          pieChart(liveSegs, { size: 82, thickness: 16 }),
+          h("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: "6px" } },
+            shownLeg.map((r) => legItem(r.color, r.name, r.pct, false)),
+            restLeg.length ? legItem("#CBD3DE", "+" + restLeg.length + " ร้านอื่น", restPct, true) : null))
+      : h("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", padding: "8px 0" } },
+          chick(58, "happy"),
+          h("div", { style: { fontSize: "11.5px", color: "var(--muted)", fontWeight: 600, textAlign: "center" } }, "ยังไม่มียอดขายเดือนนี้")),
   );
+  // ---- รายได้แต่ละร้าน (YTD สะสมทั้งปี) — การ์ดครึ่งซ้าย/ขวาคู่กับโดนัท (compact) ----
+  const storeYtdCard = (() => {
+    let acc = 0; const cumSeries = GRAB_DAILY.map((r) => ({ label: "", v: (acc += r.n) }));
+    const every = Math.max(2, Math.round(cumSeries.length / 6) * 2);
+    cumSeries.forEach((p, i) => { if (i % every === 0 || i === cumSeries.length - 1) p.label = +GRAB_DAILY[i].d.slice(8) + "/" + +GRAB_DAILY[i].d.slice(5, 7); });
+    const storeTotals = platRev.map((s, i) => ({ name: s.store, color: s.color, tot: i === 0 ? acc : 0 }));
+    return h("div", { class: "card dash-card", style: { background: "linear-gradient(150deg,#EDF6FD 0%,#E9F6F1 100%)", borderColor: "#D8EAF2", padding: "13px 12px" } },
+      h("div", { class: "dash-card-h", style: { fontSize: "12.5px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1px", marginBottom: "8px" } },
+        h("span", null, "รายได้แต่ละร้าน"),
+        h("b", { class: "tnum", style: { fontSize: "16px", color: "#2E7CB8" } }, "฿" + fmt(acc))),
+      acc > 0 ? lineChart(cumSeries, { color: "#2E96C9", h: 60 }) : null,
+      h("div", { class: "stack", style: { gap: "0", marginTop: acc > 0 ? "6px" : "2px" } }, storeTotals.map((s, i) =>
+        h("div", { style: { display: "flex", alignItems: "center", gap: "6px", padding: "5px 0", borderTop: i ? "1px solid var(--border-soft)" : "none" } },
+          h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: s.color, flex: "none" } }),
+          h("span", { style: { flex: 1, minWidth: 0, fontSize: "11px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, s.name),
+          h("b", { class: "tnum", style: { fontSize: "11.5px", color: s.tot > 0 ? "#2E7CB8" : "var(--faint)" } }, "฿" + fmt(s.tot))))),
+    );
+  })();
   // ---- สรุปการขาย (Grab · 30 วันล่าสุด) → กดเข้าหน้าวิเคราะห์ ----
   const salesInsightCard = salesSummaryCard(go);
 
-  // ---- แนวโน้มรายได้ (แท่ง=สุทธิรายวัน 30 วัน · เส้น=สะสมทั้งปี YTD คนละฐาน · เส้นประ=จุดคุ้มทุน) ----
-  const be = breakevenDaily();
+  // ---- แนวโน้มรายได้รวมทุกร้าน·ทุกแพลตฟอร์ม (แท่ง=สุทธิรายวัน · เส้น=สะสมทั้งปี · เส้นประ=คุ้มทุนจริง) ----
+  // จุดคุ้มทุน/วัน = ต้นทุนคงที่จริงเต็ม ÷ อัตรากำไรส่วนเพิ่มจริง (หน่วยยอดขายสุทธิ/วัน — แกนเดียวกับแท่ง)
+  const be = breakevenNetSalesPerDay();
   let _run = 0; const _cum = {};
   for (const r of GRAB_DAILY) { _run += r.n; _cum[r.d] = _run; }
   const ytdTotal = _run;
@@ -299,8 +338,8 @@ function ownerSalesBlock(go, shopCtx) {
     h("div", { style: { fontSize: "10.5px", color: "var(--muted)", fontWeight: 700 } }, label),
     h("div", { class: "tnum", style: { fontSize: "16px", fontWeight: 800, color } }, val));
   const vdiv = () => h("span", { style: { width: "1px", background: "var(--border-soft)", alignSelf: "stretch" } });
-  const trendCard = h("div", { class: "card dash-card" },
-    h("div", { class: "dash-card-h" }, "แนวโน้มรายได้ · สุทธิรายวัน + สะสมทั้งปี"),
+  const trendCard = h("div", { class: "card dash-card", style: { background: "linear-gradient(150deg,#FFF8EE 0%,#FEFCF6 100%)", borderColor: "#F0E4CE" } },
+    h("div", { class: "dash-card-h" }, "แนวโน้มรายได้รวมทุกร้าน · ทุกแพลตฟอร์ม"),
     trend30.length
       ? h("div", { class: "chart-box" }, revenueYtdCombo({ days: trend30, breakeven: be, h: 210, fmt }))
       : h("div", { style: { padding: "24px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12px" } }, "ยังไม่มีข้อมูล"),
@@ -313,7 +352,7 @@ function ownerSalesBlock(go, shopCtx) {
     h("div", { class: "rowflex", style: { gap: "6px", marginTop: "10px", paddingTop: "10px", borderTop: "1px solid var(--border-soft)", alignItems: "stretch" } },
       beStat("YTD · ทั้งปี", "฿" + fmt(ytdTotal), "#2E6BB0"), vdiv(),
       beStat("MTD · " + mLabel.replace("เดือน ", ""), "฿" + fmt(mNet), "#2E9B63"), vdiv(),
-      beStat("คุ้มทุน/วัน", "฿" + fmt(be), "#C8502B"),
+      beStat("คุ้มทุน/วัน", "฿" + fmt(be), "#B5781A"),
     ),
   );
 
@@ -323,11 +362,13 @@ function ownerSalesBlock(go, shopCtx) {
     fcMenuCard,
     h("div", { class: "dash-h" }, pi("clock", 14), "สรุปการขาย · Grab"),
     salesInsightCard,
-    h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "10px", alignItems: "start" } }, donutCard, trendCard),
+    h("div", { class: "dash-h", style: { justifyContent: "space-between" } },
+      h("span", { style: { display: "flex", alignItems: "center", gap: "6px" } }, pi("trend", 14), "การเงินภาพรวม · รายได้"),
+      chick(38, "cheer")),
+    h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "9px", alignItems: "stretch" } }, donutCard, storeYtdCard),
+    trendCard,
   ];
 }
-
-// ---- การ์ดสรุปการขาย (30 วันล่าสุด) — ขายดี/น้อย รายวัน · ชั่วโมงพีค/เงียบ · เมนู Top3 ----
 const _hh = (i) => String(i).padStart(2, "0") + ":00";
 const _cleanMenu = (n) => n.replace(/\[[^\]]*\]/g, "").replace(/\|.*/, "").replace(/\d+\s*kcal/gi, "").replace(/\s+/g, " ").trim();
 
@@ -399,39 +440,45 @@ function salesSummaryCard(go) {
   );
 }
 
-// ---- การ์ด: คาดการณ์การขายแต่ละเมนู ประจำวัน (ดึงพยากรณ์ fc7 = ชุดเดียวกับหน้าเตรียมของ) ----
+// ---- การ์ด: คาดว่าจะขายวันนี้ (ต่อเมนู) — จาก "ยอดขายจริง" Grab: เฉลี่ยเฉพาะวันเดียวกันของสัปดาห์ 4 ครั้งล่าสุด
+// (แก้ตามฟีดแบ็ก: ก่อนหน้านี้ใช้ตัวเลขพยากรณ์จาก seed → เมนูที่ไม่เคยขายโผล่มา · ตอนนี้โชว์เฉพาะเมนูที่ขายจริง)
 function dailyMenuForecastCard(go) {
-  const menus = (allItems() || []).filter((it) => it.isActive !== false && it.cat === "protein");
-  const rows = menus
-    .map((it) => { const s = fc7(it.id); return { it, mid: s ? (s.days[0] ? s.days[0].mid : 0) : 0, u: s ? s.u : unitOf(it) }; })
-    .filter((r) => r.mid > 0)
-    .sort((a, b) => b.mid - a.mid);
+  const namesArr = gMenuItems(); const M = gMenuDaily();
+  const nowDow = (new Date().getDay() + 6) % 7;
+  const sameDow = Object.keys(M).sort().filter((d) => wdIdx(d) === nowDow).slice(-4);
+  const sum = {};
+  for (const d of sameDow) for (const [ix, u] of M[d]) sum[ix] = (sum[ix] || 0) + u;
+  const rows = Object.keys(sum)
+    .map((ix) => ({ name: namesArr[ix], avg: sum[ix] / (sameDow.length || 1) }))
+    .filter((r) => r.name && r.avg >= 0.5)
+    .sort((a, b) => b.avg - a.avg);
   const top = rows.slice(0, 6);
-  const max = Math.max(...top.map((r) => r.mid), 1);
-  const total = rows.reduce((a, r) => a + r.mid, 0);
+  const max = Math.max(...top.map((r) => r.avg), 1);
+  const total = Math.round(rows.reduce((a, r) => a + r.avg, 0));
+  const v1 = (x) => Math.round(x * 10) / 10;
 
   const row = (r) => h("button", {
-    type: "button", class: "list-press", onClick: () => go({ name: "forecast" }),
+    type: "button", class: "list-press", onClick: () => go({ name: "salesanalytics" }),
     style: { display: "flex", alignItems: "center", gap: "10px", width: "100%", border: 0, background: "transparent", padding: "5px 0", cursor: "pointer" },
   },
-    (menuThumb(r.it.name, 34) || itemIc(r.it, { sm: true })),
-    h("span", { style: { flex: "none", width: "31%", minWidth: 0, fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" } }, r.it.name),
+    (menuThumb(r.name, 34) || h("span", { style: { width: "34px", height: "34px", borderRadius: "10px", background: "#F4F0E8", display: "grid", placeItems: "center", flex: "none" } }, "🍛")),
+    h("span", { style: { flex: "none", width: "31%", minWidth: 0, fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" } }, _cleanMenu(r.name)),
     h("span", { style: { flex: 1, height: "9px", background: "var(--surface-soft, var(--bg))", border: "1px solid var(--border-soft)", borderRadius: "999px", overflow: "hidden" } },
-      h("span", { style: { display: "block", height: "100%", width: Math.round(r.mid / max * 100) + "%", background: "#7BC8A0", borderRadius: "999px" } })),
-    h("span", { class: "tnum", style: { flex: "none", width: "72px", textAlign: "right", fontSize: "12.5px", fontWeight: 700, color: "var(--primary-dark)" } }, fmtQty(r.mid, r.u) + " " + r.u),
+      h("span", { style: { display: "block", height: "100%", width: Math.round(r.avg / max * 100) + "%", background: "#7BC8A0", borderRadius: "999px" } })),
+    h("span", { class: "tnum", style: { flex: "none", width: "72px", textAlign: "right", fontSize: "12.5px", fontWeight: 700, color: "var(--primary-dark)" } }, v1(r.avg) + " จาน"),
   );
 
   return h("div", { class: "card dash-card" },
     h("div", { class: "dash-card-h", style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" } },
       h("span", null, "คาดว่าจะขายวันนี้ (ต่อเมนู)"),
-      h("button", { type: "button", class: "ord-more list-press", style: { marginTop: 0 }, onClick: () => go({ name: "forecast" }) }, "ดูทั้งหมด", pi("chev", 13)),
+      h("span", { class: "badge badge-green", style: { fontSize: "10px" } }, "จากยอดขายจริง"),
     ),
     top.length
       ? h("div", { class: "stack", style: { gap: "7px", marginTop: "4px" } }, top.map(row))
-      : h("div", { style: { fontSize: "12.5px", color: "var(--faint)", padding: "16px 2px", textAlign: "center" } }, "ยังไม่มีข้อมูลพยากรณ์ — บันทึกยอดขายสักระยะ แล้วระบบจะคาดการณ์ให้"),
+      : h("div", { style: { fontSize: "12.5px", color: "var(--faint)", padding: "16px 2px", textAlign: "center" } }, "ยังไม่มีข้อมูลยอดขายวัน" + WD_FULL[nowDow] + " — อัปไฟล์ Menu Sales เพิ่มได้ที่หน้าอัปโหลด"),
     top.length ? h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", paddingTop: "9px", borderTop: "1px solid var(--border-soft)", fontSize: "12px", color: "var(--muted)" } },
-      pi("trend", 13), h("span", null, "รวมกับข้าวคาดขายวันนี้ "), h("b", { class: "tnum", style: { color: "var(--primary-dark)" } }, fmtQty(total) + " กก."),
-      h("span", { style: { marginLeft: "auto" } }, "จากสูตรพยากรณ์")) : null,
+      pi("trend", 13), h("span", null, "เฉลี่ยวัน" + WD_FULL[nowDow] + " (4 สัปดาห์ล่าสุด) รวม "), h("b", { class: "tnum", style: { color: "var(--primary-dark)" } }, fmt(total) + " จาน"),
+      h("span", { style: { marginLeft: "auto" } }, "Grab · ข้อมูลจริง")) : null,
   );
 }
 

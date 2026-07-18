@@ -64,6 +64,10 @@ import { forecastSettingsScreen } from "./pages/forecastsettings.js";
 import { formulaSettingsScreen } from "./pages/formulasettings.js";
 import { messagesScreen } from "./pages/messages.js";
 import { exportScreen } from "./pages/export.js";
+import { grabImportScreen } from "./pages/grabimport.js";
+import { grabReportsScreen } from "./pages/grabreports.js";
+import { finStatementScreen } from "./pages/finstatement.js";
+import { grabAssumptionsScreen } from "./pages/grabassumptions.js";
 import "./lib/image-slot.js"; // ลงทะเบียน <image-slot> + window.kkSlots
 // เปิดให้ <image-slot> แก้ไขได้ในแอปจริง (ปุ่มเปลี่ยนรูป/ลบรูป + ลากครอบรูป)
 // แม้ไม่มี window.omelette — เพราะรูป persist ผ่าน Supabase Storage (image-sync.js)
@@ -232,6 +236,11 @@ function renderContent() {
       case "menulist":      return menuListScreen(sctx);
       case "messages":      return messagesScreen(sctx);
       case "export":        return exportScreen(sctx);
+      // ---- โมดูล รายงาน Grab & งบการเงิน (เจ้าของเท่านั้น) ----
+      case "grabimport":    return grabImportScreen(sctx);
+      case "grabreports":   return grabReportsScreen(sctx);
+      case "finstatement":  return finStatementScreen(sctx);
+      case "grabassumptions": return grabAssumptionsScreen(sctx);
       default:              return placeholderScreen(r, { onBack: back });
     }
   }

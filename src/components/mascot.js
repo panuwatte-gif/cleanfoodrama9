@@ -26,9 +26,11 @@ export function mascot(s = 44, { mood = "happy", spark = false } = {}) {
 }
 
 // ไก่เชฟ — pose: wave | clipboard | phone | sprout | calc | present | fridge
+//        + อารมณ์: happy | cheer | eat | shy | sad
 export function chick(s = 96, pose = "wave", { float = false } = {}) {
   const POSE = { wave: "chick-wave", clipboard: "chick-clipboard", phone: "chick-phone",
-    sprout: "chick-sprout", calc: "chick-calc", present: "chick-present", fridge: "chick-fridge" };
+    sprout: "chick-sprout", calc: "chick-calc", present: "chick-present", fridge: "chick-fridge",
+    happy: "chick-happy", cheer: "chick-cheer", eat: "chick-eat", shy: "chick-shy", sad: "chick-sad" };
   return imgEl("assets/mascots/" + (POSE[pose] || POSE.wave) + ".png", s, "kk-mascot" + (float ? " kk-float" : ""));
 }
 

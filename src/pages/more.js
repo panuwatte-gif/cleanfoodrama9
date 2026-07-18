@@ -15,47 +15,20 @@ import { actionCount } from "../utils/messages.js";
 import { getPrepHidden, setPrepCatOn } from "../forecast/formulaLibrary.js";
 import { toggle } from "../components/components.js";
 import { items, priceRows } from "../data/store.js";
-import { beParams, setBeParams, breakevenDaily, beFixedMonth, fmt } from "../utils/formulas.js";
+import { fmt } from "../utils/formulas.js";
+import { load, save } from "../utils/storage.js";
 
-// การ์ด "ต้นทุนร้าน → จุดคุ้มทุน/วัน" — กรอกต้นทุนคงที่ + %วัตถุดิบ → คิดจุดคุ้มทุน auto (โชว์ในการ์ดแนวโน้มรายได้)
-function breakevenCard() {
-  const p = beParams();
-  const fixedEl = h("b", { class: "tnum", style: { fontSize: "14px" } }, "");
-  const beEl = h("div", { class: "tnum", style: { fontSize: "26px", fontWeight: 800, color: "#C8502B", marginTop: "1px" } }, "");
-  const formulaEl = h("div", { style: { fontSize: "11.5px", color: "var(--muted)", marginTop: "3px" } }, "");
-  function recompute() {
-    const q = beParams();
-    fixedEl.textContent = "฿" + fmt(beFixedMonth());
-    beEl.textContent = "฿" + fmt(breakevenDaily()) + " / วัน";
-    formulaEl.textContent = "= (฿" + fmt(beFixedMonth()) + " ÷ " + q.days + " วัน) ÷ (1 − " + q.varPct + "%)";
-  }
-  const numField = (label, key, suffix, hint) => {
-    const inp = h("input", { type: "text", inputMode: "decimal", value: String(p[key]),
-      style: { width: "98px", textAlign: "right", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "10px", fontWeight: 700, fontVariantNumeric: "tabular-nums", background: "var(--surface)", color: "var(--text)" } });
-    inp.addEventListener("input", () => { const s = inp.value.replace(/[^0-9.]/g, ""); if (s !== inp.value) inp.value = s; setBeParams({ [key]: s === "" ? 0 : parseFloat(s) }); recompute(); });
-    return h("div", { class: "split", style: { padding: "10px 0", borderBottom: "1px solid var(--border-soft)", gap: "10px" } },
-      h("div", { style: { flex: 1, minWidth: 0 } },
-        h("div", { style: { fontSize: "13.5px", fontWeight: 600 } }, label),
-        hint ? h("div", { style: { fontSize: "11px", color: "var(--faint)" } }, hint) : null),
-      h("div", { class: "rowflex", style: { gap: "6px", flex: "none", alignItems: "center" } }, inp,
-        h("span", { style: { fontSize: "12px", color: "var(--muted)", width: "36px" } }, suffix)));
-  };
-  const card = h("div", { class: "card more-card soft-amber", style: { padding: "6px 16px 16px" } },
-    h("div", { style: { padding: "13px 2px 4px", fontWeight: 800, fontSize: "14.5px" } }, "💰 ต้นทุนร้าน → จุดคุ้มทุน/วัน (auto)"),
-    h("div", { style: { fontSize: "12px", color: "var(--muted)", margin: "0 2px 4px" } }, "กรอกต้นทุนคงที่/เดือน + % ต้นทุนวัตถุดิบ — ระบบคิดจุดคุ้มทุนให้เอง → โชว์ในการ์ด“แนวโน้มรายได้”"),
-    numField("ค่าเช่า / เดือน", "rent", "บาท"),
-    numField("ค่าแรงประจำ / เดือน", "labor", "บาท"),
-    numField("ค่าไฟ / น้ำ / เน็ต / เดือน", "util", "บาท"),
-    numField("อื่นๆ คงที่ / เดือน", "other", "บาท"),
-    numField("ต้นทุนวัตถุดิบ", "varPct", "%", "% ของรายได้ที่ร้านได้จริง (สุทธิ)"),
-    numField("วันเปิดขาย / เดือน", "days", "วัน"),
-    h("div", { style: { marginTop: "12px", padding: "13px 15px", borderRadius: "14px", background: "linear-gradient(135deg,#FFF3E9,#FFF7F0)", border: "1.5px solid #F3D9BE" } },
-      h("div", { class: "split" }, h("span", { style: { fontSize: "12.5px", fontWeight: 700, color: "var(--muted)" } }, "ต้นทุนคงที่รวม / เดือน"), fixedEl),
-      h("div", { style: { fontSize: "12px", color: "var(--muted)", margin: "10px 0 0", fontWeight: 700 } }, "จุดคุ้มทุน · รายได้สุทธิที่ต้องทำให้ได้"),
-      beEl, formulaEl),
-  );
-  recompute();
-  return card;
+// หมวดพับ/กางได้ (จำสถานะต่อเครื่อง) — ลดการเลื่อนจอ หน้าเพิ่มเติมโล่งขึ้น
+function foldSection(key, title, ovClass, ...nodes) {
+  const open = load("moreFold_" + key, key === "grab" || key === "store"); // เปิดเฉพาะหมวดหลักเริ่มต้น
+  const body = h("div", { class: "stack", style: { gap: "10px", display: open ? "flex" : "none", flexDirection: "column" } }, ...nodes);
+  const chevIc = pi("chevd", 15); chevIc.style.transition = "transform .18s"; chevIc.style.transform = open ? "rotate(180deg)" : "none"; chevIc.style.color = "var(--faint)";
+  const head = h("button", {
+    type: "button", class: "overline " + ovClass + " list-press",
+    style: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", border: 0, background: "transparent", cursor: "pointer", padding: "6px 2px" },
+    onClick: () => { const on = body.style.display === "none"; body.style.display = on ? "flex" : "none"; chevIc.style.transform = on ? "rotate(180deg)" : "none"; save("moreFold_" + key, on); },
+  }, h("span", null, title), chevIc);
+  return h("div", { class: "stack", style: { gap: "8px" } }, head, body);
 }
 
 // หมวดในหน้า "คำแนะนำการเตรียมของ" (เปิด/ปิดการแสดงผล)
@@ -164,53 +137,58 @@ export function moreScreen(ctx = {}) {
 
       teamCard(ctx),
 
-      h("div", { class: "overline ov-green" }, "ข้อมูลกลาง · ร้าน"),
-      storeDataCard(go, store),
-
-      // ต้นทุนกลาง — วัตถุดิบดิบ (เนื้อ·ซอส · หัก yield/ค่าส่ง → สุทธิ) + อาหาร/เมนูที่รับมาขาย
-      h("div", { class: "card more-card soft-green" },
-        moreRow({ ic: "db", emoji: "🥩", c: "green", t: "ต้นทุนวัตถุดิบ (ข้อมูลกลาง)", s: "เนื้อสัตว์ · ซอส — ราคาซื้อ ÷ yield + ค่าส่ง + อื่นๆ = ต้นทุนสุทธิ/กก.", onClick: () => go({ name: "rawcost" }) }),
-        moreRow({ ic: "tag", emoji: "🍲", c: "amber", t: "ต้นทุนอาหาร (ข้อมูลกลาง)", s: "เมนูที่รับมาขาย · ราคาตั้งขาย − ส่วนลด = สุทธิ ต่อเมนู · " + priceRows().length + " รายการ", onClick: () => go({ name: "menulist" }) }),
-        moreRow({ ic: "chefhat", emoji: "🧑‍🍳", c: "violet", t: "สร้างเมนู (คิดต้นทุน + กำไร)", s: "เลือกวัตถุดิบ (กรัม/จาน) → ต้นทุน/จาน + GP·VAT·ค่าแรง·ค่าไฟ·Ads → กำไรต่อจาน", onClick: () => go({ name: "menucost" }) }),
+      foldSection("store", "ข้อมูลกลาง · ร้าน", "ov-green",
+        storeDataCard(go, store),
+        h("div", { class: "card more-card soft-green" },
+          moreRow({ ic: "db", emoji: "🥩", c: "green", t: "ต้นทุนวัตถุดิบ (ข้อมูลกลาง)", s: "เนื้อสัตว์ · ซอส — ราคาซื้อ ÷ yield + ค่าส่ง + อื่นๆ = ต้นทุนสุทธิ/กก.", onClick: () => go({ name: "rawcost" }) }),
+          moreRow({ ic: "tag", emoji: "🍲", c: "amber", t: "ต้นทุนอาหาร (ข้อมูลกลาง)", s: "เมนูที่รับมาขาย · ราคาตั้งขาย − ส่วนลด = สุทธิ · " + priceRows().length + " รายการ", onClick: () => go({ name: "menulist" }) }),
+          moreRow({ ic: "chefhat", emoji: "🧑‍🍳", c: "violet", t: "สร้างเมนู (คิดต้นทุน + กำไร)", s: "เลือกวัตถุดิบ (กรัม/จาน) → ต้นทุน/จาน + GP·VAT·ค่าแรง·ค่าไฟ·Ads → กำไรต่อจาน", onClick: () => go({ name: "menucost" }) }),
+        ),
       ),
 
-      h("div", { class: "overline ov-violet" }, "งานและทีม"),
-      h("div", { class: "card more-card soft-violet" },
-        moreRow({ ic: "mail", emoji: "💌", c: "violet", t: "งานและข้อความ", s: "ส่งข้อความ · มอบหมายงานให้หัวหน้า/พนักงาน · ติดตามผล", badge: mailCount, onClick: () => go({ name: "messages" }) }),
+      foldSection("grab", "รายงาน Grab · การเงิน (เห็นเฉพาะเจ้าของ)", "ov-blue",
+        h("div", { class: "card more-card soft-blue" },
+          moreRow({ ic: "trend", emoji: "📈", c: "blue", t: "รายงาน Grab", s: "ออเดอร์/ชั่วโมง · จ-อา · เมนู·เตรียมของ · Ads · ส่งvsใช้ · คุ้มทุน", onClick: () => go({ name: "grabreports" }) }),
+          moreRow({ ic: "wallet", emoji: "💧", c: "green", t: "งบการเงิน & Cashflow", s: "P&L รายเดือน/ไตรมาส/ปี · ภาษีขั้นบันได · เงินค้างรับ", onClick: () => go({ name: "finstatement" }) }),
+          moreRow({ ic: "cloud", emoji: "📂", c: "violet", t: "อัปโหลดข้อมูล Grab (CSV)", s: "ธุรกรรม · เมนู · เงินโอน · Ads · Peak Hour — ไฟล์เดียวหลายเดือนได้", onClick: () => go({ name: "grabimport" }) }),
+          moreRow({ ic: "settings", emoji: "🎛️", c: "amber", t: "ตั้งค่ารายงาน Grab", s: "fix cost · ภาษี · ของหาย · segment · กติกาเมนู", onClick: () => go({ name: "grabassumptions" }) }),
+        ),
       ),
 
-      h("div", { class: "overline ov-violet" }, "คำแนะนำการเตรียมของ"),
-      prepCatCard(go),
-
-      h("div", { class: "overline ov-blue" }, "ข้อมูล & สูตร"),
-      h("div", { class: "card more-card soft-blue" },
-        moreRow({ ic: "settings", emoji: "📈", c: "blue", t: "สูตรพยากรณ์", s: "เลือก/ปรับสูตร · กำหนดช่วงวัน · ข้าว ×1.5", onClick: () => go({ name: "formulasettings" }) }),
-        moreRow({ ic: "users", emoji: "👥", c: "orange", t: "ค่าแรงพนักงาน", s: "รายวัน / เงินเดือน + OT — กรอกและดูสรุปค่าแรงทั้งร้าน", onClick: () => go({ name: "payroll" }) }),
-        moreRow({ ic: "settings", emoji: "⚙️", c: "green", t: "ปรับค่า assumption", s: "GP% · ค่าการตลาด · ไข่/แผง · เกณฑ์สต๊อกต่ำ · เผื่อสั่งของ · ภาษี", onClick: () => go({ name: "assumptions" }) }),
-        moreRow({ ic: "swap", emoji: "🔄", c: "teal", t: "แปลงหน่วย", s: "ความหมายหน่วยนับ + การเทียบ/แปลงหน่วยอัตโนมัติในระบบ", onClick: () => go({ name: "unitconvert" }) }),
-        moreRow({ ic: "chefhat", emoji: "👩‍🍳", c: "violet", t: "แก้สูตรอาหาร", s: "สัดส่วน · ขั้นตอน · ล็อค/ปลดล็อคให้พนักงานดู", onClick: () => go({ name: "recipes" }) }),
+      foldSection("team", "งานและทีม · เตรียมของ", "ov-violet",
+        h("div", { class: "card more-card soft-violet" },
+          moreRow({ ic: "mail", emoji: "💌", c: "violet", t: "งานและข้อความ", s: "ส่งข้อความ · มอบหมายงาน · ติดตามผล", badge: mailCount, onClick: () => go({ name: "messages" }) }),
+        ),
+        prepCatCard(go),
       ),
 
-      h("div", { class: "overline ov-amber" }, "การเงิน · จุดคุ้มทุน"),
-      breakevenCard(),
-
-      h("div", { class: "overline ov-amber" }, "รายงานเจ้าของ"),
-      h("div", { class: "card more-card soft-amber" },
-        moreRow({ ic: "doc", emoji: "📊", c: "blue", t: "สรุปผู้บริหาร (พร้อมปริ้น)", s: "KPI · รายได้/จ่าย · ของเสีย · พยากรณ์", onClick: () => go({ name: "execsummary" }) }),
-        moreRow({ ic: "cart", emoji: "🛒", c: "amber", t: "ค่าใช้จ่ายสั่งอาหาร", s: "ปฏิทินต้นทุนรับของ · รายเมนู + ค่าส่ง · คิดจากยืนยันรับของ", onClick: () => go({ name: "orderexpense" }) }),
-        moreRow({ ic: "cal", emoji: "📅", c: "green", t: "รายรับ-จ่าย รายเดือน", s: "ปฏิทิน · ยอดสุทธิ · แก้ย้อนหลัง", onClick: () => go({ name: "money" }) }),
-        moreRow({ ic: "file", emoji: "🧾", c: "violet", t: "คำนวณภาษี", s: "ประมาณภาษีทั้งปี + เช็คเกณฑ์ VAT", onClick: () => go({ name: "tax" }) }),
+      foldSection("formula", "ข้อมูล & สูตร", "ov-blue",
+        h("div", { class: "card more-card soft-blue" },
+          moreRow({ ic: "settings", emoji: "📈", c: "blue", t: "สูตรพยากรณ์", s: "เลือก/ปรับสูตร · กำหนดช่วงวัน · ข้าว ×1.5", onClick: () => go({ name: "formulasettings" }) }),
+          moreRow({ ic: "users", emoji: "👥", c: "orange", t: "ค่าแรงพนักงาน", s: "รายวัน / เงินเดือน + OT — กรอกและดูสรุปค่าแรงทั้งร้าน", onClick: () => go({ name: "payroll" }) }),
+          moreRow({ ic: "settings", emoji: "⚙️", c: "green", t: "ปรับค่า assumption (สต๊อก/สั่งของ)", s: "ไข่/แผง · เกณฑ์สต๊อกต่ำ · เผื่อสั่งของ — ค่าฝั่งการเงินย้ายไป \"ตั้งค่ารายงาน Grab\" แล้ว", onClick: () => go({ name: "assumptions" }) }),
+          moreRow({ ic: "swap", emoji: "🔄", c: "teal", t: "แปลงหน่วย", s: "ความหมายหน่วยนับ + การเทียบ/แปลงหน่วยอัตโนมัติในระบบ", onClick: () => go({ name: "unitconvert" }) }),
+          moreRow({ ic: "chefhat", emoji: "👩‍🍳", c: "violet", t: "แก้สูตรอาหาร", s: "สัดส่วน · ขั้นตอน · ล็อค/ปลดล็อคให้พนักงานดู", onClick: () => go({ name: "recipes" }) }),
+        ),
       ),
 
-      h("div", { class: "overline ov-rose" }, "หน้าตา"),
-      h("div", { class: "card more-card soft-rose" },
-        moreRow({ ic: "image", emoji: "🎨", c: "pink", t: "ปรับสี / ธีม", s: "ธีมสำเร็จรูป · ปรับสีเองตามส่วน (ปุ่มกลาง · คำเตือน · ฯลฯ)", onClick: () => go({ name: "colorsettings" }) }),
+      foldSection("reports", "รายงานเจ้าของ", "ov-amber",
+        h("div", { class: "card more-card soft-amber" },
+          moreRow({ ic: "doc", emoji: "📊", c: "blue", t: "สรุปผู้บริหาร (พร้อมปริ้น)", s: "KPI · รายได้/จ่าย · ของเสีย · พยากรณ์", onClick: () => go({ name: "execsummary" }) }),
+          moreRow({ ic: "cart", emoji: "🛒", c: "amber", t: "ค่าใช้จ่ายสั่งอาหาร", s: "ปฏิทินต้นทุนรับของ · รายเมนู + ค่าส่ง · คิดจากยืนยันรับของ", onClick: () => go({ name: "orderexpense" }) }),
+          moreRow({ ic: "cal", emoji: "📅", c: "green", t: "รายรับ-จ่าย รายเดือน", s: "ปฏิทิน · ยอดสุทธิ · แก้ย้อนหลัง", onClick: () => go({ name: "money" }) }),
+          moreRow({ ic: "file", emoji: "🧾", c: "violet", t: "คำนวณภาษี", s: "ประมาณภาษีทั้งปี + เช็คเกณฑ์ VAT — ฉบับละเอียดอยู่ใน \"งบการเงิน\" (โหมดทั้งปี)", onClick: () => go({ name: "tax" }) }),
+        ),
       ),
 
-      h("div", { class: "overline ov-teal" }, "ระบบ"),
-      h("div", { class: "card more-card soft-teal" },
-        moreRow({ ic: "history", emoji: "🕒", c: "amber", t: "ประวัติ + แก้ย้อนหลัง", s: "ทุกการบันทึก · audit log ลบไม่ได้", onClick: () => go({ name: "history" }) }),
-        moreRow({ ic: "cloud", emoji: "☁️", c: "teal", t: "ส่งออก & สำรอง", s: "Backup · ดาวน์โหลด Excel/CSV/PDF", onClick: () => go({ name: "export" }) }),
+      foldSection("system", "หน้าตา · ระบบ", "ov-teal",
+        h("div", { class: "card more-card soft-rose" },
+          moreRow({ ic: "image", emoji: "🎨", c: "pink", t: "ปรับสี / ธีม", s: "ธีมสำเร็จรูป · ปรับสีเองตามส่วน", onClick: () => go({ name: "colorsettings" }) }),
+        ),
+        h("div", { class: "card more-card soft-teal" },
+          moreRow({ ic: "history", emoji: "🕒", c: "amber", t: "ประวัติ + แก้ย้อนหลัง", s: "ทุกการบันทึก · audit log ลบไม่ได้", onClick: () => go({ name: "history" }) }),
+          moreRow({ ic: "cloud", emoji: "☁️", c: "teal", t: "ส่งออก & สำรอง", s: "Backup · ดาวน์โหลด Excel/CSV/PDF", onClick: () => go({ name: "export" }) }),
+        ),
       ),
 
       h("button", { type: "button", class: "btn btn-block", style: { marginTop: "4px", color: "var(--danger)" }, onClick: onLogout }, "ออกจากระบบ"),
