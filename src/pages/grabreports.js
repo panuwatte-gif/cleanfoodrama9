@@ -14,6 +14,7 @@ import {
   breakevenScenarios, classifyMenu, thaiMonth, DOW_TH,
 } from "../services/grabReportService.js";
 import { menuItems, menuDaily } from "../data/grabStore.js";
+import { linemanStats } from "../services/linemanService.js";
 import { plMonth, monthList } from "../services/finStatementService.js";
 import { dishImageUrl } from "../data/menuImages.js";
 
@@ -208,10 +209,45 @@ function beTab() {
   );
 }
 
+/* ---------- มุมมอง LINE MAN (ตอนนี้ใช้ยอดรวมรายวันจากบันทึกรายได้ · เมนู/เตรียมของ รอไฟล์) ---------- */
+function linemanView(state, shopCtx) {
+  const shops = (shopCtx && shopCtx.shops) ? shopCtx.shops : [{ name: "ร้าน" }];
+  if (state.lmShop == null) state.lmShop = "all";
+  const wrap = h("div", { class: "stack", style: { gap: "10px" } });
+  function paint() {
+    const st = linemanStats(state.lmShop);
+    const chips = h("div", { class: "chip-tabs", style: { flexWrap: "wrap" } },
+      [{ k: "all", n: "รวมทุกร้าน" }, ...shops.map((s) => ({ k: s.name, n: s.name }))].map((t) =>
+        h("button", { type: "button", class: "chip" + (state.lmShop === t.k ? " active" : ""), style: { whiteSpace: "nowrap" }, onClick: () => { state.lmShop = t.k; paint(); } }, t.n)));
+    if (!st.hasData) {
+      wrap.replaceChildren(chips,
+        note(["ยังไม่มียอดขาย LINE MAN" + (state.lmShop === "all" ? "" : " ของ “" + state.lmShop + "”") + " — บันทึกยอดที่ ", h("b", null, "หน้าแรก › บันทึกรายได้ (เลือก Lineman)"), " → ระบบจะสรุป วันขายดี/ยอดรวม ให้อัตโนมัติ"], { amber: true }),
+        note(["เมนูขายดี + ตารางเตรียมวัตถุดิบของ LINE MAN จะแสดงเมื่อมี ", h("b", null, "ไฟล์ยอดขายรายเมนู"), " ให้อัปโหลด (ตอนนี้ LINE MAN ยังไม่มีไฟล์ให้ดึง)"], { iconName: "trend" }));
+      return;
+    }
+    const live = st.byDow.filter((d) => d.has);
+    const best = live.reduce((m, d) => (d.avg > m.avg ? d : m));
+    const worst = live.reduce((m, d) => (d.avg < m.avg ? d : m));
+    wrap.replaceChildren(chips,
+      h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" } },
+        kpiCard({ emoji: "💰", label: "ยอดขายรวม", value: "฿" + fmt(st.total), sub: st.days + " วันที่มีบันทึก", bg: "#DFF0E6", ink: "#2E7D4F" }),
+        kpiCard({ emoji: "📅", label: "เฉลี่ย/วัน", value: "฿" + fmt(st.avgPerDay), sub: "เฉพาะวันที่บันทึก", bg: "#E3EDFB", ink: "#2E6BB0" }),
+        kpiCard({ emoji: "⭐", label: "วันขายดีสุด", value: best.dow, sub: "เฉลี่ย ฿" + fmt(best.avg), bg: "#FFF3D6", ink: "#9A6A00" })),
+      h("div", { class: "card", style: { padding: "14px 16px" } },
+        h("div", { style: { fontWeight: 800, fontSize: "13.5px", marginBottom: "4px" } }, "📆 ยอดขาย LINE MAN เฉลี่ย/วัน (จ-อา)"),
+        barChart(st.byDow.map((d) => ({ v: d.avg, label: d.dow })), { h: 130, color: "#F2A03D" }),
+        h("div", { style: { fontSize: "11.5px", color: "var(--muted)", marginTop: "4px" } }, "ขายดีสุดวัน", h("b", null, best.dow), " · เบาสุดวัน", h("b", null, worst.dow))),
+      note(["เมนูขายดี + ตารางเตรียมวัตถุดิบของ LINE MAN จะแสดงเมื่อมี ", h("b", null, "ไฟล์ยอดขายรายเมนู"), " ให้อัปโหลด — ระหว่างนี้ใช้ยอดรวมรายวันจากบันทึกรายได้"], { iconName: "trend" }));
+  }
+  paint();
+  return wrap;
+}
+
 /* ---------- หน้าใหญ่ ---------- */
-export function grabReportsScreen({ back, go } = {}) {
+export function grabReportsScreen({ back, go, role, shopCtx } = {}) {
+  const isOwner = role === "owner";
   const segs = segments();
-  const state = { tab: "hour", seg: segs[segs.length - 1].id };
+  const state = { tab: "hour", seg: segs[segs.length - 1].id, plat: "grab", lmShop: "all" };
   // KPI สรุปบน: ใช้ segment ล่าสุดที่มีข้อมูล
   let latest = null;
   for (const s of segs.slice().reverse()) { const st = segStats(s.id); if (st && st.hasData) { latest = st; break; } }
@@ -230,24 +266,38 @@ export function grabReportsScreen({ back, go } = {}) {
         : beTab(),
     );
   }
+  const tabDefs = isOwner
+    ? [["hour", "🕐 รายชั่วโมง"], ["dow", "📆 จ-อา"], ["menu", "🍛 เมนู·เตรียมของ"], ["ads", "📣 Ads"], ["loss", "⚖️ ส่งvsใช้"], ["be", "🎯 คุ้มทุน"]]
+    : [["hour", "🕐 ชั่วโมงขายดี"], ["dow", "📆 วันขายดี"], ["menu", "🍛 เมนู·เตรียมของ"]];
   const tabs = h("div", { class: "chip-tabs", style: { flexWrap: "wrap" } },
-    [["hour", "🕐 รายชั่วโมง"], ["dow", "📆 จ-อา"], ["menu", "🍛 เมนู·เตรียมของ"], ["ads", "📣 Ads"], ["loss", "⚖️ ส่งvsใช้"], ["be", "🎯 คุ้มทุน"]].map(([id, t]) =>
+    tabDefs.map(([id, t]) =>
       h("button", { type: "button", class: "chip" + (state.tab === id ? " active" : ""), style: { whiteSpace: "nowrap" }, onClick: (e) => { state.tab = id; [...e.currentTarget.parentNode.children].forEach((b) => b.classList.remove("active")); e.currentTarget.classList.add("active"); repaint(); } }, t)),
   );
 
   repaint();
+  const kpiCards = [
+    kpiCard({ emoji: "🛵", label: "ออเดอร์/วัน", value: latest ? String(latest.ordersPerDay) : "—", sub: latest ? "ช่วง" + latest.seg.name : "", bg: "#DFF0E6", ink: "#2E7D4F" }),
+    kpiCard({ emoji: "🧾", label: "ยอด/ออเดอร์ (AOV)", value: latest ? "฿" + latest.aov : "—", sub: "ยอดขายเฉลี่ย/จาน", bg: "#E3EDFB", ink: "#2E6BB0" }),
+  ];
+  if (isOwner) kpiCards.push(
+    kpiCard({ emoji: "💵", label: "เงินเข้า/ออเดอร์", value: latest ? "฿" + latest.poPerOrder : "—", sub: "หลังหักทุกค่าธรรมเนียม", bg: "#FFF3D6", ink: "#9A6A00" }),
+    kpiCard({ emoji: "🎯", label: "ROAS", value: "×" + ads.roas, sub: ads.roas >= 3 ? "ดีมาก (เกณฑ์ ≥3)" : "ควรทบทวน", bg: ads.roas >= 3 ? "#DFF0E6" : "#FFF3D6", ink: ads.roas >= 3 ? "#2E7D4F" : "#9A6A00" }),
+    kpiCard({ emoji: "📉", label: "ของหาย", value: sv.pctT + "%", sub: "฿" + fmt(sv.costT) + " ในรอบส่งล่าสุด", bg: "#FBE9E7", ink: "#B3402A" }),
+    kpiCard({ emoji: "🌱", label: "กำไร " + (pl ? thaiMonth(pl.ym) : ""), value: pl ? (pl.net >= 0 ? "฿" + fmt(pl.net) : "−฿" + fmt(-pl.net)) : "—", sub: "ดูเต็มที่หน้างบการเงิน", bg: pl && pl.net >= 0 ? "#DFF0E6" : "#FBE9E7", ink: pl && pl.net >= 0 ? "#2E7D4F" : "#B3402A" }),
+  );
+  const page = h("div", { class: "page stack", style: { paddingBottom: "16px" } });
+  const staffNote = note(["ข้อมูลนี้ช่วยให้ทีม ", h("b", null, "เตรียมของล่วงหน้า"), " ให้พอดี — ดูว่าวันนี้/วันไหนขายดี เมนูไหนขายเยอะ แล้ววางแผนเตรียมวัตถุดิบตามตารางด้านล่าง"], { iconName: "trend" });
+  function renderMain() {
+    const platBar = h("div", { class: "chip-tabs", style: { marginBottom: "10px" } },
+      [["grab", "🛵 Grab"], ["lineman", "🏍️ LINE MAN"]].map(([id, t]) =>
+        h("button", { type: "button", class: "chip" + (state.plat === id ? " active" : ""), style: { whiteSpace: "nowrap", fontWeight: 700 }, onClick: () => { state.plat = id; renderMain(); } }, t)));
+    if (state.plat === "lineman") { page.replaceChildren(platBar, linemanView(state, shopCtx)); return; }
+    const kpiGrid = h("div", { style: { display: "grid", gridTemplateColumns: isOwner ? "1fr 1fr 1fr" : "1fr 1fr", gap: "8px" } }, ...kpiCards);
+    page.replaceChildren(...[platBar, isOwner ? null : staffNote, kpiGrid, tabs, body].filter(Boolean));
+  }
+  renderMain();
   return h("div", { class: "page-wrap", "data-screen-label": "grabreports" },
-    hdr({ title: "รายงาน Grab", sub: "จากไฟล์จริง ม.ค. – ก.ค. 69 · ทุกตัวเลขมีป้ายที่มา", onBack: back, right: h("span", { class: "owner-tag" }, pi("lock", 11), "เจ้าของ") }),
-    h("div", { class: "page stack", style: { paddingBottom: "16px" } },
-      h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" } },
-        kpiCard({ emoji: "🛵", label: "ออเดอร์/วัน", value: latest ? String(latest.ordersPerDay) : "—", sub: latest ? "ช่วง" + latest.seg.name : "", bg: "#DFF0E6", ink: "#2E7D4F" }),
-        kpiCard({ emoji: "🧾", label: "ยอด/ออเดอร์ (AOV)", value: latest ? "฿" + latest.aov : "—", sub: "ยอดขายสุทธิเฉลี่ย", bg: "#E3EDFB", ink: "#2E6BB0" }),
-        kpiCard({ emoji: "💵", label: "เงินเข้า/ออเดอร์", value: latest ? "฿" + latest.poPerOrder : "—", sub: "หลังหักทุกค่าธรรมเนียม", bg: "#FFF3D6", ink: "#9A6A00" }),
-        kpiCard({ emoji: "🎯", label: "ROAS", value: "×" + ads.roas, sub: ads.roas >= 3 ? "ดีมาก (เกณฑ์ ≥3)" : "ควรทบทวน", bg: ads.roas >= 3 ? "#DFF0E6" : "#FFF3D6", ink: ads.roas >= 3 ? "#2E7D4F" : "#9A6A00" }),
-        kpiCard({ emoji: "📉", label: "ของหาย", value: sv.pctT + "%", sub: "฿" + fmt(sv.costT) + " ในรอบส่งล่าสุด", bg: "#FBE9E7", ink: "#B3402A" }),
-        kpiCard({ emoji: "🌱", label: "กำไร " + (pl ? thaiMonth(pl.ym) : ""), value: pl ? (pl.net >= 0 ? "฿" + fmt(pl.net) : "−฿" + fmt(-pl.net)) : "—", sub: "ดูเต็มที่หน้างบการเงิน", bg: pl && pl.net >= 0 ? "#DFF0E6" : "#FBE9E7", ink: pl && pl.net >= 0 ? "#2E7D4F" : "#B3402A" }),
-      ),
-      tabs, body,
-    ),
+    hdr({ title: "รายงานการขาย", sub: isOwner ? "Grab · LINE MAN · ทุกตัวเลขมีป้ายที่มา" : "ช่วงขายดี · เมนูขายดี · เตรียมของล่วงหน้า", onBack: back, right: isOwner ? h("span", { class: "owner-tag" }, pi("lock", 11), "เจ้าของ") : null }),
+    page,
   );
 }

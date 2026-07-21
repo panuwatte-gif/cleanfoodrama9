@@ -119,6 +119,34 @@ export function prepTable(id) {
   };
 }
 
+/* ---------- Grab → การใช้วัตถุดิบรายวัน ต่อ item id (กก.) ----------
+   แปลงยอดขายเมนู Grab แต่ละวัน → กก. โปรตีนที่ใช้จริง แล้ว map เข้ารหัส item ของระบบ
+   (ชุดข้อมูลเดียวกับ "ตารางเตรียมวัตถุดิบ" — ใช้ portions + proteinRules เดียวกัน)
+   ป้อนหน้า "คำแนะนำการเตรียมของ" ให้ตัวเลขตรงกับรายงาน Grab (เฉพาะวันที่พนักงานไม่ได้กรอกเอง) */
+export const PROTEIN_ITEM = { "เนื้อ": "kp-beef", "แซลมอน": "kp-salmon", "อกไก่สับ": "kp-breast", "อกไก่นุ่ม": "kp-soft", "เป็ด": "kp-duck", "กุ้ง": "kp-shrimp" };
+let _gduCache = null, _gduSig = "";
+export function grabDailyItemUsage() {
+  const M = menuDaily(); const ks = Object.keys(M);
+  const sig = ks.length + "|" + (ks.sort().slice(-1)[0] || "");
+  if (_gduCache && _gduSig === sig) return _gduCache;
+  const A = grabAssum(); const names = menuItems();
+  const out = {};
+  for (const d in M) {
+    const rows = M[d]; if (!rows) continue;
+    const day = {};
+    const add = (proteinName, kg) => { const id = PROTEIN_ITEM[proteinName]; if (id) day[id] = (day[id] || 0) + kg; };
+    for (const [ix, units] of rows) {
+      const c = classifyMenu(names[ix] || ""); if (c.kind !== "dish") continue;
+      const meatKg = (A.portions[c.size].meat * units) / 1000;
+      if (c.protein === "ผสม แซลมอน/อกไก่") { add("แซลมอน", meatKg / 2); add("อกไก่สับ", meatKg / 2); }
+      else add(c.protein, meatKg);
+    }
+    out[d] = day;
+  }
+  _gduCache = out; _gduSig = sig;
+  return out;
+}
+
 /* ---------- D5: เทียบ ส่ง vs ใช้ ---------- */
 // ใช้ (กก.) คำนวณจากยอดขายเมนูจริงในช่วงส่ง · ส่ง (กก.) จาก assumptions (อัปเดตเองต่อรอบส่ง)
 export function ingredientUseKg(from, to) {

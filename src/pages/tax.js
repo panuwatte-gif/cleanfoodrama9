@@ -21,6 +21,13 @@ const actualExpenseOf = (annualRev) => Math.round(annualRev * COST_MODEL.varRati
 // ค่าเริ่มต้นจากข้อมูลจริง (รายได้/ค่าใช้จ่ายที่บันทึก) — ไม่มี = 0 (กรอกเองได้)
 const monthIncomeReal = () => Math.round(incomeRows().reduce((s, r) => s + (r.net != null ? r.net : (r.gross || 0)), 0));
 const monthExpenseReal = () => Math.round(expenseRows().reduce((s, r) => s + (r.amount || 0), 0));
+// รายได้/ค่าใช้จ่าย "จริง" รายเดือน (YYYY-MM) — ป้อน dropdown เลือกเดือนในหน้าภาษี
+const MONTHS_TH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const _sumByMonth = (rows, val) => { const m = {}; for (const r of rows) { const ym = (r.date || "").slice(0, 7); if (!ym) continue; m[ym] = (m[ym] || 0) + val(r); } return m; };
+const incomeByMonth = () => _sumByMonth(incomeRows(), (r) => (r.net != null ? r.net : (r.gross || 0)));
+const expenseByMonth = () => _sumByMonth(expenseRows(), (r) => (r.amount || 0));
+const monthsWithData = () => [...new Set([...Object.keys(incomeByMonth()), ...Object.keys(expenseByMonth())])].sort();
+const thMonthLabel = (ym) => MONTHS_TH[+ym.slice(5) - 1] + " " + String(+ym.slice(0, 4) + 543).slice(-2);
 
 const txt = { tab: "calc", calc: null, plan: null, ctx: null };
 
@@ -28,10 +35,13 @@ export function taxScreen(ctx) {
   txt.ctx = ctx;
   txt.tab = "calc";
   const pd = assume("tax-deduct", 60000);
-  const inc = monthIncomeReal();
-  const exp = monthExpenseReal();
+  const months = monthsWithData();
+  const im = incomeByMonth(), em = expenseByMonth();
+  const ym = months.length ? months[months.length - 1] : "";
+  const inc = ym ? Math.round(im[ym] || 0) : 0;
+  const exp = ym ? Math.round(em[ym] || 0) : 0;
   const cActualDefault = exp > 0 ? exp * 12 : actualExpenseOf(inc * 12);
-  txt.calc = { m: String(inc), cMethod: "actual", cActual: String(Math.round(cActualDefault)), cPersonal: String(pd), cSso: String(SSO_MAX), cLife: "0", cDonate: "0" };
+  txt.calc = { m: String(inc), ym: ym || "avg", cMethod: "actual", cActual: String(Math.round(cActualDefault)), cPersonal: String(pd), cSso: String(SSO_MAX), cLife: "0", cDonate: "0" };
   txt.plan = { entity: "person", jdVat: false, gp: "30", period: "month", rev: String(inc), costPct: String(realCostPct()), deduct: "actual", pSso: String(SSO_MAX), pLife: "0", pDonate: "0" };
   const root = h("div", { class: "page-wrap", style: { display: "flex", flexDirection: "column", flex: 1 } });
   paint(root);
@@ -99,6 +109,29 @@ function buildCalc(root) {
 
   const actualIn = qtyInput({ value: c.cActual, onChange: (v) => { c.cActual = v; recalc(); }, wide: true });
 
+  // dropdown เลือกเดือน (ม.ค.–ธ.ค.) — ตั้งรายได้ + ค่าใช้จ่ายตามจริงของเดือนนั้น · ไม่มีข้อมูล = กรอกมือ
+  const months = monthsWithData();
+  const im = incomeByMonth(), em = expenseByMonth();
+  const monthSel = h("select", { class: "input", style: { fontSize: "13px", padding: "8px 10px", width: "100%" } },
+    h("option", { value: "avg" }, "เฉลี่ยทุกเดือนที่มีข้อมูล"),
+    ...months.map((m) => h("option", { value: m }, thMonthLabel(m) + " · รายได้ ฿" + fmt(Math.round(im[m] || 0)) + " · จ่าย ฿" + fmt(Math.round(em[m] || 0)))),
+  );
+  monthSel.value = c.ym || "avg";
+  monthSel.addEventListener("change", () => {
+    const v = monthSel.value; c.ym = v;
+    if (v === "avg") {
+      const n = months.length || 1;
+      c.m = String(Math.round(months.reduce((s, k) => s + (im[k] || 0), 0) / n));
+      const ex = Math.round(months.reduce((s, k) => s + (em[k] || 0), 0) / n);
+      c.cActual = String(ex > 0 ? ex * 12 : actualExpenseOf(num(c.m) * 12));
+    } else {
+      c.m = String(Math.round(im[v] || 0));
+      const ex = Math.round(em[v] || 0);
+      c.cActual = String(ex > 0 ? ex * 12 : actualExpenseOf(num(c.m) * 12));
+    }
+    paint(root);
+  });
+
   function recalc() {
     const cAnnual = num(c.m) * 12;
     incomeHint.textContent = "= ทั้งปี ฿" + fmt(cAnnual) + " · ค่าเริ่มต้นจากรายได้เดือนนี้";
@@ -153,7 +186,12 @@ function buildCalc(root) {
   const out = [
     note([h("span", null, "ทุกช่องตั้ง"), bold("ค่าเริ่มต้นจากข้อมูลจริงในระบบ"), "แล้ว — รายได้ · ค่าใช้จ่ายตามจริง · ลดหย่อน แก้ทับได้ทุกช่อง"], { iconName: "wallet" }),
     h("div", { class: "card" },
-      h("div", { style: { fontSize: "12px", fontWeight: 600, color: "var(--muted)", marginBottom: "6px" } }, "รายได้เฉลี่ย / เดือน (ดึงจากระบบ · แก้ได้)"),
+      months.length
+        ? h("div", { style: { marginBottom: "10px" } },
+            h("div", { style: { fontSize: "12px", fontWeight: 600, color: "var(--muted)", marginBottom: "6px" } }, "เลือกเดือน (ดึงรายได้ + ค่าใช้จ่ายจริงของเดือนนั้น)"),
+            monthSel)
+        : note("ยังไม่มีข้อมูลรายเดือนในระบบ — กรอกรายได้/ค่าใช้จ่ายเองด้านล่างได้"),
+      h("div", { style: { fontSize: "12px", fontWeight: 600, color: "var(--muted)", marginBottom: "6px" } }, "รายได้ / เดือน (ดึงจากระบบ · แก้ได้)"),
       h("div", { class: "rowflex", style: { gap: "8px" } }, incomeIn, h("span", { style: { fontSize: "13px", color: "var(--muted)", flex: "none" } }, "บาท")),
       incomeHint,
     ),

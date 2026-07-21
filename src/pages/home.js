@@ -28,7 +28,7 @@ import { load, save } from "../utils/storage.js";
 import { PEAK_DAILY } from "../data/peakhours.js";
 import { GRAB_DAILY, grabMonth, menuShare } from "../data/grabData.js";
 import { menuDaily as gMenuDaily, menuItems as gMenuItems } from "../data/grabStore.js";
-import { breakevenScenarios, breakevenNetSalesPerDay } from "../services/grabReportService.js";
+import { breakevenScenarios, breakevenNetSalesPerDay, prepTable, segments, DOW_TH } from "../services/grabReportService.js";
 
 const MONTH_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const WD_FULL = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
@@ -164,6 +164,20 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
         ),
       ),
 
+      // ── พนักงาน: คาดว่าจะขายวันนี้ + ช่วงขายดี/เมนูขายดี (เอาไว้เตรียมของ) ──
+      !isOwner && h("div", { class: "dash-h" }, pi("trend", 14), "คาดว่าจะขายวันนี้ (ต่อเมนู)"),
+      !isOwner && dailyMenuForecastCard(go),
+      !isOwner && h("div", { class: "dash-h" }, pi("clock", 14), "ช่วงขายดี · วันขายดี · เมนูขายดี"),
+      !isOwner && salesInsightBlock(go, shopCtx),
+      !isOwner && h("div", { class: "dash-h" }, pi("clipboard", 14), "เตรียมวัตถุดิบสัปดาห์นี้ (จ.–อา.)"),
+      !isOwner && dashboardPrepCard(shopCtx),
+      !isOwner && h("button", { type: "button", class: "orderplan-cta alt", onClick: () => go({ name: "grabreports" }) },
+        cic("doc-report", 30),
+        h("div", { style: { flex: 1, textAlign: "left" } },
+          h("div", { style: { fontWeight: 800, fontSize: "14px" } }, "ดูรายงานขายเต็ม (ชั่วโมง · วัน · เมนู)"),
+          h("div", { style: { fontSize: "11.5px", opacity: .85 } }, "ช่วงพีค · วันขายดี · ตารางเตรียมวัตถุดิบ")),
+        pi("chev", 18)),
+
       // บันทึกรายได้ / ค่าใช้จ่าย
       h("div", { class: "home-2col" },
         h("button", { type: "button", class: "mf soft-card soft-violet list-press", onClick: () => go({ name: "income" }) },
@@ -188,32 +202,6 @@ export function homeScreen({ go, role, toast, shopCtx, user } = {}) {
           h("div", { class: "lt-sub" }, "เลือกหัวข้อ (รายการเปิดร้าน · ของใกล้หมด · ยอดขาย) → กดส่งได้เลย"),
         ),
         h("span", { class: "line-go" }, "รอส่ง", pi("chev", 14)),
-      ),
-
-      // สต๊อกต่ำ
-      h("div", { class: "card", style: { background: "linear-gradient(135deg,#FFF1F7 0%,#F6F0FF 55%,#FFF6EC 100%)", borderColor: "#F4D9E6", padding: "14px" } },
-        h("div", { class: "split", style: { marginBottom: "12px" } },
-          h("div", { class: "rowflex" },
-            h("span", { class: "catic rose" }, pi("alert", 18)),
-            h("div", { style: { minWidth: 0 } },
-              h("div", { style: { fontWeight: 800, fontSize: "15.5px", color: "var(--danger-ink)" } }, "สต๊อกต่ำ " + lowItems.length + " รายการ"),
-              h("div", { style: { fontSize: "12px", color: "var(--muted)" } }, "วัตถุดิบและสินค้าสำคัญ · FIFO"),
-            ),
-          ),
-          h("button", { type: "button", class: "lowstock-btn list-press", onClick: () => go({ name: "stocklist", low: true }) }, "ดูทั้งหมด", pi("chev", 13)),
-        ),
-        h("div", { class: "low-grid" },
-          lowItems.map(({ it, info }) => {
-            const st = lowStat(info);   // info มี qty + use ครบ
-            const color = st.c === "s-ok" ? "var(--primary-dark)" : st.c === "s-mid" ? "var(--warning-ink)" : "var(--danger)";
-            return h("div", { class: "low-cell", onClick: () => go({ name: "stockdetail", id: it.id }) },
-              h("span", { class: "low-stat " + st.c }, st.t),
-              lowThumb(it),
-              h("div", { style: { fontSize: "11.5px", fontWeight: 700, lineHeight: 1.25, marginTop: "6px" } }, it.name),
-              h("div", { class: "tnum", style: { fontSize: "10.5px", color, fontWeight: 800 } }, "เหลือ " + info.qty + " " + unitOf(it)),
-            );
-          }),
-        ),
       ),
 
       // ตัวช่วย 4 ไทล์
@@ -325,7 +313,7 @@ function ownerSalesBlock(go, shopCtx) {
     );
   })();
   // ---- สรุปการขาย (Grab · 30 วันล่าสุด) → กดเข้าหน้าวิเคราะห์ ----
-  const salesInsightCard = salesSummaryCard(go);
+  const salesInsightCard = salesInsightBlock(go, shopCtx);
 
   // ---- แนวโน้มรายได้รวมทุกร้าน·ทุกแพลตฟอร์ม (แท่ง=สุทธิรายวัน · เส้น=สะสมทั้งปี · เส้นประ=คุ้มทุนจริง) ----
   // จุดคุ้มทุน/วัน = ต้นทุนคงที่จริงเต็ม ÷ อัตรากำไรส่วนเพิ่มจริง (หน่วยยอดขายสุทธิ/วัน — แกนเดียวกับแท่ง)
@@ -360,6 +348,8 @@ function ownerSalesBlock(go, shopCtx) {
     statRow,
     h("div", { class: "dash-h" }, pi("trend", 14), "คาดว่าจะขายวันนี้ (ต่อเมนู)"),
     fcMenuCard,
+    h("div", { class: "dash-h" }, pi("clipboard", 14), "เตรียมวัตถุดิบสัปดาห์นี้ (จ.–อา.)"),
+    dashboardPrepCard(shopCtx),
     h("div", { class: "dash-h" }, pi("clock", 14), "สรุปการขาย · Grab"),
     salesInsightCard,
     h("div", { class: "dash-h", style: { justifyContent: "space-between" } },
@@ -391,6 +381,25 @@ function insightSection(head, dotColor, left, right) {
       h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: dotColor, flex: "none" } }),
       h("div", { style: { fontSize: "13px", fontWeight: 800, color: "var(--text)" } }, head)),
     right ? h("div", { style: { display: "flex", gap: "14px" } }, left, right) : left);
+}
+
+// store tabs ครอบการ์ด วันขายดี/เมนูขายดี (default รวมทุกร้าน + เลือกรายร้าน)
+function salesInsightBlock(go, shopCtx) {
+  const shops = (shopCtx && shopCtx.shops) ? shopCtx.shops : [{ name: "ร้าน" }];
+  const primary = shops[0] ? shops[0].name : "";
+  const wrap = h("div", { class: "stack", style: { gap: "8px" } });
+  let store = "all";
+  function paint() {
+    const chips = h("div", { class: "chip-tabs", style: { flexWrap: "wrap" } },
+      [{ k: "all", n: "รวมทุกร้าน" }, ...shops.map((s) => ({ k: s.name, n: s.name }))].map((t) =>
+        h("button", { type: "button", class: "chip" + (store === t.k ? " active" : ""), style: { whiteSpace: "nowrap" }, onClick: () => { store = t.k; paint(); } }, t.n)));
+    const has = (store === "all" || store === primary);
+    wrap.replaceChildren(chips, has
+      ? salesSummaryCard(go)
+      : h("div", { class: "card", style: { padding: "22px 10px", textAlign: "center", color: "var(--faint)", fontSize: "12.5px", lineHeight: 1.5 } }, "ยังไม่มียอดขายของ “" + store + "” — เมื่อร้านนี้เริ่มขาย/อัปโหลดข้อมูล ระบบจะแยกวันขายดี·เมนูขายดีให้"));
+  }
+  paint();
+  return wrap;
 }
 
 function salesSummaryCard(go) {
@@ -438,6 +447,60 @@ function salesSummaryCard(go) {
     h("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", marginTop: "12px", paddingTop: "11px", borderTop: "1px solid var(--border-soft)", fontSize: "12.5px", color: "var(--primary-dark)", fontWeight: 700 } },
       "ดูวิเคราะห์การขายเต็ม (รายวัน · รายชั่วโมง · เมนู)", pi("chev", 14)),
   );
+}
+
+// ---- การ์ด: ตารางเตรียมวัตถุดิบ (จ.–อา.) บนแดชบอร์ด — รูปแบบเดียวกันทั้งแอป
+//   • default = "รวมทุกร้าน" · มี tab เลือกดูรายร้าน (ครอบทั้งภาพรวม + รายร้าน)
+//   • ตัวเลข = กรัมสุก/วัน จากยอดขายจริง (ชุดเดียวกับตารางในรายงาน Grab → ตรงกัน)
+function dashboardPrepCard(shopCtx) {
+  const shops = (shopCtx && shopCtx.shops) ? shopCtx.shops : [{ name: "ร้าน" }];
+  const segs = segments();
+  const segId = segs.length ? segs[segs.length - 1].id : null;
+  const primary = shops[0] ? shops[0].name : "";
+  const wrap = h("div", { class: "card dash-card" });
+  let store = "all";
+  const cellS = { padding: "5px 3px", fontSize: "11px", textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  function paint() {
+    // ปัจจุบันมีข้อมูลจริงเฉพาะร้านแรก (Grab) → "รวมทุกร้าน" = ร้านแรก · ร้านอื่นยังไม่มีข้อมูล
+    const hasData = segId && (store === "all" || store === primary);
+    const prep = hasData ? prepTable(segId) : null;
+    const chips = h("div", { class: "chip-tabs", style: { flexWrap: "wrap", marginBottom: "10px" } },
+      [{ k: "all", n: "รวมทุกร้าน" }, ...shops.map((s) => ({ k: s.name, n: s.name }))].map((t) =>
+        h("button", { type: "button", class: "chip" + (store === t.k ? " active" : ""), style: { whiteSpace: "nowrap" }, onClick: () => { store = t.k; paint(); } }, t.n)));
+    const head = h("div", { class: "dash-card-h", style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" } },
+      h("span", null, "ตารางเตรียมวัตถุดิบ (จ.–อา.)"),
+      h("span", { class: "badge badge-green", style: { fontSize: "10px" } }, "กรัมสุก/วัน"));
+    if (!prep || !prep.proteins.length) {
+      wrap.replaceChildren(head, chips,
+        h("div", { style: { padding: "22px 8px", textAlign: "center", color: "var(--faint)", fontSize: "12px", lineHeight: 1.5 } },
+          "ยังไม่มีข้อมูลยอดขายของ" + (store === "all" ? "ร้าน" : "“" + store + "”") + " — กรอก/อัปโหลดยอดขายก่อน แล้วระบบจะคำนวณการเตรียมของให้อัตโนมัติ"));
+      return;
+    }
+    const grid = (children) => h("div", { style: { display: "grid", gridTemplateColumns: "58px repeat(7,1fr) 46px", alignItems: "center" } }, ...children);
+    const table = h("div", { style: { overflowX: "auto" } }, h("div", { style: { minWidth: "410px" } },
+      grid([
+        h("div", { style: { ...cellS, textAlign: "left", fontWeight: 700 } }, "วัตถุดิบ"),
+        ...DOW_TH.map((d) => h("div", { style: { ...cellS, textAlign: "center", fontWeight: 700 } }, d)),
+        h("div", { style: { ...cellS, fontWeight: 800, color: "var(--primary-dark)" } }, "เฉลี่ย"),
+      ]),
+      ...prep.proteins.map((p) => grid([
+        h("div", { style: { ...cellS, textAlign: "left", fontWeight: 700, borderBottom: "1px solid var(--border-soft)" } }, p.name),
+        ...p.byDow.map((v) => h("div", { style: { ...cellS, textAlign: "center", color: "var(--muted)", borderBottom: "1px solid var(--border-soft)" } }, fmt(v))),
+        h("div", { style: { ...cellS, fontWeight: 800, color: "var(--primary-dark)", borderBottom: "1px solid var(--border-soft)" } }, fmt(p.avg)),
+      ])),
+    ));
+    const riceCards = prep.rice.filter((r) => r.cooked > 0);
+    const riceRow = riceCards.length ? h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "10px" } },
+      riceCards.map((rr) => h("div", { style: { borderRadius: "12px", background: "#FFF7E8", padding: "9px 11px" } },
+        h("div", { style: { fontSize: "11.5px", fontWeight: 700 } }, "🍚 " + rr.name),
+        h("div", { class: "tnum", style: { fontSize: "15px", fontWeight: 800, marginTop: "2px" } }, fmt(rr.cooked) + " ก.สุก/วัน"),
+        h("div", { style: { fontSize: "10.5px", color: "var(--muted)" } }, "≈ ข้าวสาร " + fmt(rr.raw) + " ก.")))) : null;
+    wrap.replaceChildren(head, chips, table,
+      h("div", { style: { fontSize: "10.5px", color: "var(--faint)", marginTop: "7px" } }, "เฉลี่ยจากยอดขายจริง แยกวันจันทร์–อาทิตย์ · หน่วยกรัมสุก/วัน"),
+      riceRow);
+  }
+  paint();
+  return wrap;
 }
 
 // ---- การ์ด: คาดว่าจะขายวันนี้ (ต่อเมนู) — จาก "ยอดขายจริง" Grab: เฉลี่ยเฉพาะวันเดียวกันของสัปดาห์ 4 ครั้งล่าสุด

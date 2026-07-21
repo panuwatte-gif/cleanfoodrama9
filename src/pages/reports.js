@@ -120,6 +120,34 @@ function orderPlanCard(go) {
   return card;
 }
 
+// การ์ดสต๊อกต่ำ (ย้ายมาจากหน้าแรก) — ของใช้ได้ < 1.5 วัน
+function lowStockCard(go) {
+  const low = (items() || []).map((it) => ({ it, info: stockOf(it.id) }))
+    .filter((x) => x.it && x.info && x.info.use > 0 && (x.info.qty / x.info.use) < 1.5)
+    .sort((a, b) => (a.info.qty / a.info.use) - (b.info.qty / b.info.use)).slice(0, 8);
+  return h("div", { class: "card", style: { background: "linear-gradient(135deg,#FFF1F7 0%,#F6F0FF 55%,#FFF6EC 100%)", borderColor: "#F4D9E6", padding: "14px" } },
+    h("div", { class: "split", style: { marginBottom: "12px" } },
+      h("div", { class: "rowflex" },
+        h("span", { class: "catic rose" }, pi("alert", 18)),
+        h("div", { style: { minWidth: 0 } },
+          h("div", { style: { fontWeight: 800, fontSize: "15.5px", color: "var(--danger-ink)" } }, "สต๊อกต่ำ " + low.length + " รายการ"),
+          h("div", { style: { fontSize: "12px", color: "var(--muted)" } }, "วัตถุดิบและสินค้าสำคัญ · FIFO"))),
+      h("button", { type: "button", class: "lowstock-btn list-press", onClick: () => go({ name: "stocklist", low: true }) }, "ดูทั้งหมด", pi("chev", 13))),
+    low.length
+      ? h("div", { class: "low-grid" }, low.map(({ it, info }) => {
+          const days = info.qty / info.use;
+          const scls = days < 0.6 ? "s-vlo" : days < 1 ? "s-lo" : "s-mid";
+          const stt = days < 0.6 ? "ต่ำมาก" : days < 1 ? "ต่ำ" : "ใกล้หมด";
+          const color = scls === "s-mid" ? "var(--warning-ink)" : "var(--danger)";
+          return h("div", { class: "low-cell", onClick: () => go({ name: "stockdetail", id: it.id }) },
+            h("span", { class: "low-stat " + scls }, stt),
+            h("div", { class: "low-thumb", style: { display: "flex", alignItems: "center", justifyContent: "center" } }, itemIc(it, { sm: false })),
+            h("div", { style: { fontSize: "11.5px", fontWeight: 700, lineHeight: 1.25, marginTop: "6px" } }, it.name),
+            h("div", { class: "tnum", style: { fontSize: "10.5px", color, fontWeight: 800 } }, "เหลือ " + info.qty + " " + unitOf(it)));
+        }))
+      : h("div", { style: { fontSize: "12.5px", color: "var(--muted)", padding: "8px 2px", textAlign: "center" } }, "ไม่มีของใกล้หมด 🎉"));
+}
+
 export function reportsScreen({ go, role, shopCtx } = {}) {
   const store = shopCtx ? shopCtx.shop : "พระราม 9";
   const daily = realDaily();
@@ -193,6 +221,7 @@ export function reportsScreen({ go, role, shopCtx } = {}) {
     hdr({ title: "รายงาน", sub: store + " · รายงานผลทั้งหมดอยู่ที่นี่", right: storeChip(shopCtx) }),
     h("div", { class: "page stack" },
       orderPlanCard(go),
+      lowStockCard(go),
       card("soft-blue", "box", "blue", "สินค้าคงเหลือ & ของทิ้ง",
         tag(stockHave.length + " รายการ", { kind: "fifo", iconName: "box" }),
         h("div", { class: "rowflex", style: { gap: "10px", marginTop: "11px" } },

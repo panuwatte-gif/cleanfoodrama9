@@ -5,6 +5,7 @@
 // ============================================================
 
 import { cats, items, assumptions, assume, stockRows, salesRows } from "../data/store.js";
+import { grabDailyItemUsage } from "../services/grabReportService.js";
 import {
   TODAY, FC_BASE, DOW_SALES, STOCK_SEED, SHOP_ONLY, ORDER_CAT_IDS,
   ICON_EMOJI, ITEM_EMOJI, SUB_TINT, CAT_TINT, SECTION_TINT, UNIT_CHOICES,
@@ -178,14 +179,25 @@ export const stockOf = (id) => {
 // ⚠ ใช้เฉพาะ "ช่วง 30 วันล่าสุด" ของข้อมูลที่มี (ไม่เอาของเก่ามาเฉลี่ยรวม → อัตราเพี้ยน)
 const _USE_WINDOW = 30;
 export const avgDailyUse = (id) => {
-  const rows = salesRows().filter((r) => r.item === id && r.sold != null && r.date);
-  if (!rows.length) return 0;
-  // กรอบ 30 วันล่าสุดเทียบกับวันที่ใหม่สุดที่มีบันทึกของรายการนี้
-  const latest = rows.reduce((mx, r) => (r.date > mx ? r.date : mx), rows[0].date);
+  // 1) ยอดที่พนักงานกรอกเอง (แม่นสุด — มาก่อนเสมอ)
+  const staff = salesRows().filter((r) => r.item === id && r.sold != null && r.date);
+  const staffDates = new Set(staff.map((r) => r.date));
+  const merged = staff.map((r) => ({ date: r.date, sold: Number(r.sold) || 0 }));
+  // 2) เติม "เฉพาะวันที่พนักงานไม่ได้กรอก" ด้วยยอดใช้จริงจาก Grab (กันค่าเฉลี่ยต่ำเกินจริง
+  //    เพราะช่วงหลังพนักงานไม่ได้ลงข้อมูล — ข้อมูล Grab ครอบคลุมถึงปัจจุบัน)
+  const gdu = grabDailyItemUsage();
+  for (const d in gdu) {
+    if (staffDates.has(d)) continue;
+    const kg = gdu[d][id];
+    if (kg != null) merged.push({ date: d, sold: kg });
+  }
+  if (!merged.length) return 0;
+  // กรอบ 30 วันล่าสุดเทียบกับวันที่ใหม่สุดที่มีข้อมูล (ไม่เอาของเก่ามาเฉลี่ยรวม → อัตราเพี้ยน)
+  const latest = merged.reduce((mx, r) => (r.date > mx ? r.date : mx), merged[0].date);
   const cut = new Date(new Date(latest + "T00:00:00").getTime() - _USE_WINDOW * 86400000);
   const cutIso = cut.getFullYear() + "-" + String(cut.getMonth() + 1).padStart(2, "0") + "-" + String(cut.getDate()).padStart(2, "0");
   let sum = 0, n = 0;
-  for (const r of rows) { if (r.date >= cutIso) { sum += Number(r.sold) || 0; n++; } }
+  for (const r of merged) { if (r.date >= cutIso) { sum += r.sold; n++; } }
   return n ? Math.round((sum / n) * 1000) / 1000 : 0;
 };
 

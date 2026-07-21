@@ -9,16 +9,58 @@ import { pi } from "../components/icons.js";
 import { searchBox, note, tag, itemIc, menuTabs, hdr, meter, toggle, qtyInput, emo } from "../components/components.js";
 import { sheet } from "../components/sheet.js";
 import { sectionsFor, stockOf, stockVariants, itemById, unitOf, threshOf, proteinSubIds } from "../utils/formulas.js";
-import { cats, items as allItems, stockRows, editStockQty, setStockThreshold } from "../data/store.js";
+import { cats, items as allItems, stockRows, editStockQty, setStockThreshold, saveItem, removeItem, addItem, addCategory, saveCategory, removeCategory, moveCategory, moveItem } from "../data/store.js";
 
 const st = {
   lowOnly: false, top: "all", sub: "all", openItem: null, q: "",
   alertSheet: false, editStock: null, qty: {}, lineOn: true,
-  thresh: {},
+  thresh: {}, manage: false,
   ctx: null,
 };
 
 const bold = (t) => h("b", null, t);
+
+// ปุ่มจิ๋วในโหมดจัดการ
+function mmini(label, fn, tone) {
+  return h("button", { type: "button", style: { padding: "4px 9px", fontSize: "12px", fontWeight: 700, borderRadius: "8px", border: "1px solid var(--border-soft)", background: tone === "danger" ? "#FDECEC" : "var(--surface)", color: tone === "danger" ? "var(--danger)" : "var(--text)", cursor: "pointer", flex: "none" }, onClick: fn }, label);
+}
+// โหมดจัดการ: เพิ่ม/ลบ/แก้ชื่อ/สลับตำแหน่ง ทั้งรายการและหมวด
+function manageChildren(root) {
+  const ctx = st.ctx;
+  const refresh = () => paint(root);
+  const blocks = cats().map((c) => {
+    const catItems = allItems().filter((it) => it.cat === c.id && it.isActive !== false);
+    const itemRows = catItems.map((it) => h("div", { class: "rowflex", style: { gap: "5px", padding: "7px 0", borderTop: "1px solid var(--border-soft)" } },
+      itemIc(it),
+      h("span", { style: { flex: 1, minWidth: 0, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.name),
+      mmini("▲", async () => { await moveItem(it.id, -1); refresh(); }),
+      mmini("▼", async () => { await moveItem(it.id, 1); refresh(); }),
+      mmini("แก้ชื่อ", async () => { const nm = prompt("แก้ชื่อรายการ", it.name); if (nm && nm.trim()) { await saveItem({ ...it, name: nm.trim() }); ctx.toast("แก้ชื่อแล้ว"); refresh(); } }),
+      mmini("ลบ", async () => { if (confirm("ลบ \"" + it.name + "\" ?")) { await removeItem(it.id); ctx.toast("ลบรายการแล้ว"); refresh(); } }, "danger"),
+    ));
+    return h("div", { class: "card", style: { padding: "9px 13px", marginBottom: "10px" } },
+      h("div", { class: "rowflex", style: { gap: "5px", paddingBottom: "8px", borderBottom: "2px solid var(--border-soft)" } },
+        h("span", { class: "ent2-cat-ic" }, emo(c.icon || "box", { s: 18 })),
+        h("span", { style: { flex: 1, minWidth: 0, fontWeight: 800, fontSize: "14px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, c.name),
+        mmini("▲", async () => { await moveCategory(c.id, -1); refresh(); }),
+        mmini("▼", async () => { await moveCategory(c.id, 1); refresh(); }),
+        mmini("แก้ชื่อ", async () => { const nm = prompt("แก้ชื่อหมวด", c.name); if (nm && nm.trim()) { await saveCategory(c.id, { name: nm.trim() }); ctx.toast("แก้ชื่อหมวดแล้ว"); refresh(); } }),
+        mmini("ลบ", async () => { const r = await removeCategory(c.id); ctx.toast(r.ok ? "ลบหมวดแล้ว" : r.reason); refresh(); }, "danger"),
+      ),
+      ...itemRows,
+      h("button", { type: "button", class: "chip", style: { marginTop: "9px" }, onClick: async () => { const nm = prompt("ชื่อรายการใหม่ในหมวด " + c.name); if (nm && nm.trim()) { await addItem({ name: nm.trim(), cat: c.id }); ctx.toast("เพิ่มรายการแล้ว"); refresh(); } } }, pi("plus", 12), "เพิ่มรายการ"),
+    );
+  });
+  return [
+    h("div", { class: "rowflex", style: { gap: "8px", marginBottom: "2px" } },
+      h("button", { type: "button", class: "chip active", onClick: () => { st.manage = false; paint(root); } }, pi("chevl", 13), "เสร็จ / กลับ"),
+      h("span", { style: { flex: 1, fontWeight: 800, fontSize: "15px" } }, "จัดการรายการ & หมวด"),
+    ),
+    note(["เพิ่ม/ลบ/แก้ชื่อ/สลับตำแหน่ง ", bold("รายการและหมวด"), " — มีผลทั้งแอป (ตรวจนับ · เตรียมของ · รายงาน)"], { iconName: "edit" }),
+    ...blocks,
+    h("button", { type: "button", class: "btn btn-primary btn-block", style: { marginTop: "4px" }, onClick: async () => { const nm = prompt("ชื่อหมวดใหม่"); if (nm && nm.trim()) { await addCategory(nm.trim()); ctx.toast("เพิ่มหมวดแล้ว"); paint(root); } } }, pi("plus", 16), "เพิ่มหมวดใหม่"),
+  ];
+}
 
 export function stockListScreen(ctx) {
   st.ctx = ctx;
@@ -115,15 +157,15 @@ function paint(root) {
     ),
     menuTabs({ cats: cats(), top: st.top, sub: st.sub, onTop: (id) => { st.q = ""; st.top = id; st.sub = "all"; paint(root); }, onSub: (id) => { st.q = ""; st.sub = id; paint(root); } }),
 
-    h("button", { type: "button", class: "card list-press split", style: { width: "100%", padding: "11px 14px", textAlign: "left" }, onClick: () => { st.alertSheet = true; renderSheets(root); } },
+    h("button", { type: "button", class: "card list-press split", style: { width: "100%", padding: "11px 14px", textAlign: "left" }, onClick: () => { st.manage = true; paint(root); } },
       h("div", { class: "rowflex" },
-        h("span", { class: "catic blue sm" }, pi("bell", 15)),
+        h("span", { class: "catic violet sm" }, pi("edit", 15)),
         h("div", { style: { minWidth: 0 } },
-          h("div", { style: { fontSize: "13.5px", fontWeight: 700 } }, "เกณฑ์แจ้งเตือนของต่ำ (LINE)"),
-          h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "ของถึงเกณฑ์ → bot เตือนในกลุ่มร้าน · ตั้งได้ทุกรายการ"),
+          h("div", { style: { fontSize: "13.5px", fontWeight: 700 } }, "จัดการรายการ & หมวด"),
+          h("div", { style: { fontSize: "11.5px", color: "var(--muted)" } }, "เพิ่ม · แก้ชื่อ · ลบ · สลับตำแหน่ง — ทั้งรายการและหมวด"),
         ),
       ),
-      tag(st.lineOn ? "เปิด" : "ปิด", { kind: st.lineOn ? "ok" : "warn", iconName: st.lineOn ? "check" : "bell" }),
+      pi("chev", 16),
     ),
 
     note(["ข้อมูลชุดเดียวกับ", bold("หน้าแรก → ตรวจนับสินค้าคงเหลือ"), " · แตะรายการเพื่อดู ", bold("ใช้ได้อีกกี่วัน"), " + ", bold("FIFO ละเอียด"), " (กี่วัน-กี่กิโล)"], { iconName: "scale" }),
@@ -142,6 +184,8 @@ function paint(root) {
     )),
     !sections.length && h("p", { style: { fontSize: "13px", color: "var(--faint)", textAlign: "center", padding: "14px 0", margin: 0 } }, lowOnly ? "ไม่มีของใกล้หมดในหมวดนี้ 🎉" : "ไม่พบรายการ"),
   );
+
+  if (st.manage) content.replaceChildren(...manageChildren(root));
 
   root.replaceChildren(
     hdr({ title: "สินค้าคงเหลือ", sub: storeName + " · อัปเดต 18:40 เมื่อวาน", onBack: ctx.back, right: bellBtn }),

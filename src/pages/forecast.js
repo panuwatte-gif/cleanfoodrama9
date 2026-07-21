@@ -294,11 +294,10 @@ function paint(root) {
       // เลือกสูตร + เลื่อนสัปดาห์ + ปฏิทินย้อนหลัง
       prepControls(root, cfg, forms),
 
-      // แถบ 7 วัน
+      // แถบ 7 วัน — โชว์วัน + อารมณ์วันขายดี/เงียบ (ตัดตัวเลข "รวม กก./วัน" ที่เอาทุกจานมาบวกกันออก — ไม่มีความหมาย)
       h("div", { class: "fc7-week" }, fst.week.map((w, i) => h("div", { class: "fc7-wd" + (w.today ? " today" : "") },
         h("div", { class: "fc7-wd-d" }, w.abbr), h("div", { class: "fc7-wd-date" }, w.label),
-        h("div", { class: "fc7-wd-face" }, faceOf(dayTotals[i])),
-        h("div", { class: "fc7-wd-kg tnum" }, dayTotals[i] > 0 ? fmtQty(dayTotals[i]) + " กก." : "—")))),
+        h("div", { class: "fc7-wd-face" }, faceOf(dayTotals[i]))))),
 
       // สรุป
       h("div", { class: "fc7-sum-grid" },

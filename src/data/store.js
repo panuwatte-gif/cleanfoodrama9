@@ -312,6 +312,52 @@ export async function removeItem(id) {
   return true;
 }
 
+// ---- หมวด + รายการ: เพิ่ม/แก้ชื่อ/ลบ/สลับตำแหน่ง (หน้าสินค้าคงเหลือ · ข้อมูลกลาง) ----
+export async function addCategory(name, opts = {}) {
+  const d = initData();
+  const id = opts.id || "cat-" + Date.now();
+  d.cats.push({ id, name: name || "หมวดใหม่", icon: opts.icon || "box", unit: opts.unit || "kg", tint: opts.tint || "green" });
+  persist(); bumpData(); return id;
+}
+export async function saveCategory(id, patch) {
+  const c = cats().find((x) => x.id === id);
+  if (c) { Object.assign(c, patch); persist(); bumpData(); }
+  return clone(c || null);
+}
+export async function removeCategory(id) {
+  const active = items().filter((it) => it.cat === id && it.isActive !== false);
+  if (active.length) return { ok: false, reason: "ยังมี " + active.length + " รายการในหมวดนี้ — ย้าย/ลบรายการก่อน" };
+  const d = initData();
+  d.cats = cats().filter((c) => c.id !== id);
+  persist(); bumpData(); return { ok: true };
+}
+export async function moveCategory(id, dir) {
+  const list = cats(); const i = list.findIndex((c) => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return false;
+  const t = list[i]; list[i] = list[j]; list[j] = t;
+  persist(); bumpData(); return true;
+}
+// สลับตำแหน่งรายการ "ภายในหมวดเดียวกัน" (ข้ามรายการหมวดอื่นในอาเรย์)
+export async function moveItem(id, dir) {
+  const list = items(); const i = list.findIndex((x) => x.id === id);
+  if (i < 0) return false;
+  const cat = list[i].cat;
+  let j = i + dir;
+  while (j >= 0 && j < list.length && list[j].cat !== cat) j += dir;
+  if (j < 0 || j >= list.length) return false;
+  const t = list[i]; list[i] = list[j]; list[j] = t;
+  persist(); bumpData(); return true;
+}
+// เพิ่มรายการใหม่ (คืน id) — ค่าเริ่มต้นพอใช้งาน แก้เพิ่มได้ที่ข้อมูลกลาง
+export async function addItem({ name, cat, unit, sub } = {}) {
+  const d = initData();
+  const id = "it-" + Date.now();
+  const c = cats().find((x) => x.id === cat);
+  d.items.push({ id, name: name || "รายการใหม่", cat, sub: sub || undefined, unit: unit || (c && c.unit) || "kg", cost: 0, isActive: true });
+  persist(); bumpData(); return id;
+}
+
 // ---- เมนู (เพิ่ม/แก้/ลบ) — sync ขึ้น rama9_menus (ลบจริงได้เพราะ backend mirror delete) ----
 export async function saveMenu(menu) {
   const list = menus();
